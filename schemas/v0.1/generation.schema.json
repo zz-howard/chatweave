@@ -32,7 +32,7 @@
       }
     },
     "stopResponse": {
-      "description": "Result of POST .../messages/{messageId}/stop. stopping: generation is being cancelled; a message.end with status interrupted and error code cancelled follows. already_ended: nothing to stop; use the persisted message.",
+      "description": "Result of POST .../messages/{messageId}/stop. stopping: generation is being cancelled (also for a paused message: its open interrupt is closed as cancelled / reason 'stopped'); a message.end with status interrupted and error code cancelled follows. already_ended: nothing to stop; use the persisted message.",
       "type": "object",
       "required": [
         "messageId",
@@ -53,7 +53,7 @@
       }
     },
     "activeMessagesResponse": {
-      "description": "Result of GET .../conversations/{conversationId}/active-messages. Empty list when nothing is generating. A list because a group conversation may have several generations at once.",
+      "description": "Result of GET .../conversations/{conversationId}/active-messages: messages that have not ended (streaming or paused). Empty list when there are none. A list because a group conversation may have several generations at once.",
       "type": "object",
       "required": [
         "messages"
@@ -81,6 +81,12 @@
                 "description": "Last seq emitted so far (0 if none yet).",
                 "type": "integer",
                 "minimum": 0
+              },
+              "status": {
+                "description": "streaming (default): being generated. paused: waiting for the user to answer an interrupt (docs/protocol.md 4.8); the message is listed until it ends so a client can show the question and resubscribe after answering.",
+                "type": "string",
+                "enum": ["streaming", "paused"],
+                "default": "streaming"
               },
               "replyTo": {
                 "description": "Id of the user message this generation answers, so a client can match its pending user message.",

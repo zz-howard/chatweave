@@ -15,9 +15,9 @@
     "conversationId": { "$ref": "action.schema.json#/$defs/messageId" },
     "role": { "type": "string", "enum": ["assistant", "user", "system"] },
     "status": {
-      "description": "streaming: still being produced. complete: finished normally. interrupted: producer stopped early (crash, cancel, upstream failure); content so far is kept. error: nothing usable was produced; fallbackText explains.",
+      "description": "streaming: still being produced. paused: the run is waiting for the user to answer an interrupt (see 'interrupt'); the same message resumes after the answer (docs/protocol.md 4.8). complete: finished normally. interrupted: producer stopped early (crash, cancel, upstream failure, unanswered interrupt expired); content so far is kept. error: nothing usable was produced; fallbackText explains.",
       "type": "string",
-      "enum": ["streaming", "complete", "interrupted", "error"]
+      "enum": ["streaming", "paused", "complete", "interrupted", "error"]
     },
     "blocks": {
       "type": "array",
@@ -30,9 +30,18 @@
       "maxLength": 16000
     },
     "rev": {
-      "description": "Persisted revision. 1 when the message is first completed; +1 for every later change (e.g. a choice block resolved).",
+      "description": "Persisted revision. 0 while the message has not ended (streaming or paused checkpoints); 1 when the message is first completed; +1 for every later change (e.g. a choice block resolved).",
       "type": "integer",
       "minimum": 0
+    },
+    "lastSeq": {
+      "description": "Only on checkpoints of a message that has not ended (rev 0): seq of the last event folded into this version. Required while paused. A synced checkpoint replaces local state only if lastSeq >= the locally applied seq; ended messages (rev >= 1) never carry it.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "interrupt": {
+      "description": "Present exactly while status is 'paused': the one open interrupt the run is waiting on (docs/protocol.md 4.8). Aligned with AG-UI 1.0 Interrupt (RUN_FINISHED outcome 'interrupt').",
+      "$ref": "#/$defs/interrupt"
     },
     "createdAt": { "type": "string", "format": "date-time" },
     "completedAt": { "type": "string", "format": "date-time" },
@@ -42,9 +51,9 @@
       "maxProperties": 16
     },
     "steps": {
-      "description": "Compact run trace (docs/protocol.md 4.7): the steps the assistant took while producing this message, in step.started order. Stored separately from blocks: steps take no block index, are not counted in blockCount and are never part of fallbackText. Each entry holds only id, host-written label, state, duration and an optional host-written one-line summary (plus blockId for awaiting_user). Never tool names, arguments, raw results or model text (including reasoning). Omitted when there were no steps. Step ids must be unique within the message (checked by the library, not expressible here).",
+      "description": "Compact run trace (docs/protocol.md 4.7): the steps the assistant took while producing this message, in step.started order. Stored separately from blocks: steps take no block index, are not counted in blockCount and are never part of fallbackText. Each entry holds only id, host-written label, state, duration, an optional host-written one-line summary, the block a step asked the user through (blockId), and for nested steps the enclosing delegate step (parentStepId). Never tool names, sub-agent names, arguments, raw results or model text (including reasoning). Omitted when there were no steps. Checked by the library, not expressible here: step ids are unique within the message; parentStepId names an earlier step of kind 'delegate' (so no cycles); nesting depth <= 3; at most one step is awaiting_user and it is the interrupt's step.",
       "type": "array",
-      "maxItems": 32,
+      "maxItems": 64,
       "items": { "$ref": "#/$defs/traceStep" }
     },
     "view": {
@@ -54,15 +63,32 @@
   },
   "allOf": [
     {
-      "if": { "properties": { "status": { "const": "streaming" } } },
+      "if": { "properties": { "status": { "enum": ["streaming", "paused"] } } },
       "then": { "properties": { "rev": { "const": 0 } } },
       "else": {
+        "not": { "required": ["lastSeq"] },
         "properties": {
           "rev": { "minimum": 1 },
           "steps": {
             "$comment": "Once the message has ended, every step has ended too: the producer emits step.finished for each started step before message.end.",
-            "items": { "properties": { "state": { "not": { "const": "running" } } } }
+            "items": { "properties": { "state": { "enum": ["succeeded", "failed", "cancelled"] } } }
           }
+        }
+      }
+    },
+    {
+      "$comment": "A paused message carries exactly one open interrupt, its lastSeq, and exactly one awaiting_user step (the interrupt's step). Any other status carries no interrupt and no awaiting_user step.",
+      "if": { "properties": { "status": { "const": "paused" } }, "required": ["status"] },
+      "then": {
+        "required": ["interrupt", "lastSeq", "steps"],
+        "properties": {
+          "steps": { "contains": { "properties": { "state": { "const": "awaiting_user" } }, "required": ["state"] }, "minContains": 1, "maxContains": 1 }
+        }
+      },
+      "else": {
+        "not": { "required": ["interrupt"] },
+        "properties": {
+          "steps": { "items": { "properties": { "state": { "not": { "const": "awaiting_user" } } } } }
         }
       }
     },
@@ -96,12 +122,38 @@
       "maxLength": 120
     },
     "stepEndState": {
-      "description": "succeeded / failed (affects only this step) / awaiting_user (the run handed over to the user; blockId points at the interaction block in the content) / cancelled (still running when the user stopped the generation).",
+      "description": "succeeded / failed (affects only this step) / cancelled (still running or waiting when the user stopped the generation, or its interrupt expired). Waiting for the user is not an end state: the step is awaiting_user while the message is paused and returns to running when the answer arrives (docs/protocol.md 4.8).",
       "type": "string",
-      "enum": ["succeeded", "failed", "awaiting_user", "cancelled"]
+      "enum": ["succeeded", "failed", "cancelled"]
+    },
+    "stepKind": {
+      "description": "'delegate': the step hands work to a sub-agent; the sub-agent's own steps nest under it via parentStepId (collapsed by default in the process strip). Omitted for ordinary steps (a tool call or other unit of work). The sub-agent's internal name is never sent; the host-written label describes the delegation.",
+      "type": "string",
+      "enum": ["delegate"]
+    },
+    "interruptId": {
+      "description": "Opaque id of one interrupt (maps to AG-UI Interrupt.id). Unique within the message.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "interrupt": {
+      "description": "What a paused run is waiting for. The question itself is the interaction block (blockId) in the content; the step (stepId) is the one that asked and is awaiting_user. Expiry comes from the block's action.expiresAt.",
+      "type": "object",
+      "required": ["id", "stepId", "blockId", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/interruptId" },
+        "stepId": { "$ref": "#/$defs/stepId" },
+        "blockId": { "$ref": "content-block.schema.json#/$defs/blockId" },
+        "reason": {
+          "description": "AG-UI 1.0 core reason values: 'confirmation' (approve or decline an operation, e.g. a confirmation block before a tool runs) or 'input_required' (the agent needs an answer, e.g. a choice or form_intent block from an ask_user tool).",
+          "type": "string",
+          "enum": ["confirmation", "input_required"]
+        }
+      }
     },
     "durationMs": {
-      "description": "Elapsed time of the step in milliseconds (a duration, not a point in time).",
+      "description": "Working time of the step in milliseconds (a duration, not a point in time). Time spent paused waiting for the user is not counted.",
       "type": "integer",
       "minimum": 0,
       "maximum": 86400000
@@ -113,28 +165,32 @@
       "properties": {
         "id": { "$ref": "#/$defs/stepId" },
         "label": { "$ref": "#/$defs/stepLabel" },
+        "kind": { "$ref": "#/$defs/stepKind" },
+        "parentStepId": {
+          "description": "For a sub-agent's step: the enclosing delegate step. Absent for the main agent's top-level steps.",
+          "$ref": "#/$defs/stepId"
+        },
         "state": {
-          "description": "running only while the message is streaming (snapshots, checkpoints); never in a message that has ended.",
+          "description": "running: in progress (also a delegate step whose sub-agent is waiting on the user). awaiting_user: this step asked the user and the message is paused on its interrupt. Neither appears in a message that has ended.",
           "type": "string",
-          "enum": ["running", "succeeded", "failed", "awaiting_user", "cancelled"]
+          "enum": ["running", "awaiting_user", "succeeded", "failed", "cancelled"]
         },
         "durationMs": { "$ref": "#/$defs/durationMs" },
         "summary": { "$ref": "#/$defs/stepSummary" },
         "blockId": {
-          "description": "awaiting_user only: the interaction block (choice / confirmation / form_intent) in this message's content that waits for the user.",
+          "description": "The interaction block (choice / confirmation / form_intent) in this message's content through which this step asked the user. Required while awaiting_user; kept after the answer so the step row can show it.",
           "$ref": "content-block.schema.json#/$defs/blockId"
         }
       },
       "allOf": [
         {
-          "if": { "properties": { "state": { "const": "running" } } },
+          "if": { "properties": { "state": { "enum": ["running", "awaiting_user"] } } },
           "then": { "not": { "anyOf": [ { "required": ["durationMs"] }, { "required": ["summary"] } ] } },
           "else": { "required": ["durationMs"] }
         },
         {
           "if": { "properties": { "state": { "const": "awaiting_user" } } },
-          "then": { "required": ["blockId"] },
-          "else": { "not": { "required": ["blockId"] } }
+          "then": { "required": ["blockId"] }
         }
       ]
     }

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/zz-howard/chatweave/schemas/v0.1/stream-event.schema.json",
   "title": "ChatWeave Stream Event (draft 0.1)",
-  "description": "DRAFT. One event of a per-message block stream. Transport-neutral; the SSE binding puts seq in the SSE 'id' field and the JSON below in 'data'. (messageId, seq) is unique: consumers drop events with seq <= last applied seq and reconnect on gaps. Consumers ignore unknown event types (but still advance seq). Exception: message.activity is a transient, display-only event without seq; it is never logged, replayed, folded or persisted, and its SSE frame has no 'id' line. Run step events (step.started / step.finished, aligned with AG-UI 1.0 STEP_STARTED / STEP_FINISHED, see docs/protocol.md 4.7 and 10.1) are ordinary sequenced events: logged, replayed, folded into message.steps and included in snapshots.",
+  "description": "DRAFT. One event of a per-message block stream. Transport-neutral; the SSE binding puts seq in the SSE 'id' field and the JSON below in 'data'. (messageId, seq) is unique: consumers drop events with seq <= last applied seq and reconnect on gaps. Consumers ignore unknown event types (but still advance seq). Exception: message.activity is a transient, display-only event without seq; it is never logged, replayed, folded or persisted, and its SSE frame has no 'id' line. Run step events (step.started / step.finished, aligned with AG-UI 1.0 STEP_STARTED / STEP_FINISHED, see docs/protocol.md 4.7 and 10.1) are ordinary sequenced events: logged, replayed, folded into message.steps and included in snapshots. message.paused / message.resumed (aligned with AG-UI 1.0 RUN_FINISHED outcome 'interrupt' and the resuming run, see docs/protocol.md 4.8) pause and resume the same message: seq continues across the pause, and the server closes the stream after message.paused.",
   "type": "object",
   "required": ["protocolVersion", "type", "messageId"],
   "properties": {
@@ -17,6 +17,8 @@
         "block.patch",
         "block.end",
         "message.end",
+        "message.paused",
+        "message.resumed",
         "message.snapshot",
         "message.activity",
         "step.started",
@@ -40,6 +42,8 @@
     { "$ref": "#/$defs/blockPatch" },
     { "$ref": "#/$defs/blockEnd" },
     { "$ref": "#/$defs/messageEnd" },
+    { "$ref": "#/$defs/messagePaused" },
+    { "$ref": "#/$defs/messageResumed" },
     { "$ref": "#/$defs/messageSnapshot" },
     { "$ref": "#/$defs/streamError" },
     { "$ref": "#/$defs/messageActivity" },
@@ -73,6 +77,7 @@
             "validation_failed",
             "upstream_failed",
             "cancelled",
+            "interrupt_expired",
             "internal"
           ]
         },
@@ -214,6 +219,32 @@
         "error": { "$ref": "#/$defs/error" }
       }
     },
+    "messagePaused": {
+      "description": "The run is waiting for the user (docs/protocol.md 4.8). Before it: every started block has ended, the interrupt block is open, and no step is running except the interrupt's step and its enclosing delegate steps. Folding: status becomes 'paused', the interrupt's step becomes awaiting_user with blockId. The server persists the paused checkpoint (rev 0, lastSeq = this seq) and closes the stream. The only events that may follow: block.patch of the interrupt block, then message.resumed (answered) or the closing sequence step.finished(cancelled)... message.end(interrupted) (stopped / expired). Aligned with AG-UI 1.0 RUN_FINISHED{outcome: {type: 'interrupt', interrupts: [one]}}.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "required": ["seq", "interrupt", "fallbackText", "blockCount"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "const": "message.paused" },
+        "interrupt": { "$ref": "message.schema.json#/$defs/interrupt" },
+        "fallbackText": {
+          "description": "Plain text of the message so far, including the question, for text-only clients and notifications.",
+          "type": "string",
+          "maxLength": 16000
+        },
+        "blockCount": { "type": "integer", "minimum": 1, "maximum": 64 }
+      }
+    },
+    "messageResumed": {
+      "description": "The interrupt was answered and the run continues in the same message (seq continues). Must directly follow the block.patch that records the answer (interrupt block -> resolved). Folding: status back to 'streaming', the awaiting_user step back to running. Aligned with the RUN_STARTED of the AG-UI run that carries RunAgentInput.resume.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "required": ["seq", "interruptId"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "const": "message.resumed" },
+        "interruptId": { "$ref": "message.schema.json#/$defs/interruptId" }
+      }
+    },
     "messageSnapshot": {
       "description": "Full message state. Sent on resume when the requested seq can no longer be replayed, or by servers that do not keep an event log. Replaces the consumer's local state for this message.",
       "allOf": [{ "$ref": "#/$defs/envelope" }],
@@ -236,18 +267,20 @@
       }
     },
     "stepStarted": {
-      "description": "A run step started (state running). Aligned with AG-UI 1.0 STEP_STARTED: stepId maps to stepName, label to metadata.label. Sequenced like block events and folded into message.steps, never into blocks. Sent to every subscriber (dropping it per recipient would create seq gaps); clients without the 'stream.steps' feature ignore it as an unknown event type and still advance seq.",
+      "description": "A run step started (state running). Aligned with AG-UI 1.0 STEP_STARTED: stepId maps to stepName, label to metadata.label; a 'delegate' step also maps to SUBAGENT_STARTED, and a nested step carries the enclosing delegate's subagentRunId (docs/protocol.md 10.1). parentStepId must name an earlier step of kind 'delegate' that is still running (no cycles), nesting depth <= 3 (library check). Sequenced like block events and folded into message.steps, never into blocks. Sent to every subscriber (dropping it per recipient would create seq gaps); clients without the 'stream.steps' feature ignore it as an unknown event type and still advance seq.",
       "allOf": [{ "$ref": "#/$defs/envelope" }],
       "required": ["seq", "stepId", "label"],
       "unevaluatedProperties": false,
       "properties": {
         "type": { "const": "step.started" },
         "stepId": { "$ref": "message.schema.json#/$defs/stepId" },
-        "label": { "$ref": "message.schema.json#/$defs/stepLabel" }
+        "label": { "$ref": "message.schema.json#/$defs/stepLabel" },
+        "kind": { "$ref": "message.schema.json#/$defs/stepKind" },
+        "parentStepId": { "$ref": "message.schema.json#/$defs/stepId" }
       }
     },
     "stepFinished": {
-      "description": "A run step ended; each step ends exactly once and never changes afterwards. Aligned with AG-UI 1.0 STEP_FINISHED, extended with a first-class end state and duration (AG-UI carries only stepName). The producer must finish every started step before message.end (cancelled when the user stops).",
+      "description": "A run step ended; each step ends exactly once and never changes afterwards. Aligned with AG-UI 1.0 STEP_FINISHED (and SUBAGENT_FINISHED / SUBAGENT_ERROR for a delegate step), extended with a first-class end state and duration (AG-UI carries only stepName). Waiting for the user is not an end: it is expressed by message.paused / message.resumed. A delegate step ends only after all its nested steps have ended. The producer must finish every started step before message.end (cancelled when the user stops or the interrupt expires).",
       "allOf": [{ "$ref": "#/$defs/envelope" }],
       "required": ["seq", "stepId", "state", "durationMs"],
       "unevaluatedProperties": false,
@@ -256,12 +289,8 @@
         "stepId": { "$ref": "message.schema.json#/$defs/stepId" },
         "state": { "$ref": "message.schema.json#/$defs/stepEndState" },
         "durationMs": { "$ref": "message.schema.json#/$defs/durationMs" },
-        "summary": { "$ref": "message.schema.json#/$defs/stepSummary" },
-        "blockId": { "$ref": "#/$defs/blockId" }
-      },
-      "if": { "properties": { "state": { "const": "awaiting_user" } } },
-      "then": { "required": ["blockId"] },
-      "else": { "not": { "required": ["blockId"] } }
+        "summary": { "$ref": "message.schema.json#/$defs/stepSummary" }
+      }
     },
     "messageActivity": {
       "description": "Transient progress hint for display only (e.g. 'checking the weather...'). Carries NO seq: it is not written to the event log, not replayed on resume, not folded into the message and not included in snapshots, so fold(events) == persisted message still holds. Sent only to clients that declared the 'stream.activity' feature. Clients keep only the latest hint per message and clear it on the next sequenced event, a newer hint, or message.end.",

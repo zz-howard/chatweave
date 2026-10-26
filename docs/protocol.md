@@ -48,15 +48,17 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 | `protocolVersion` | ✅ | 生成这条消息时使用的协议版本，例如 `"0.1"` |
 | `conversationId` | | 宿主的会话标识，库只当作不透明字符串 |
 | `role` | ✅ | `assistant` / `user` / `system`。用户消息通常只有一个 markdown 块 |
-| `status` | ✅ | `streaming`（生成中）/ `complete`（正常结束）/ `interrupted`（中途停止，已产出的内容保留）/ `error`（没有可用内容，`fallbackText` 说明原因） |
+| `status` | ✅ | `streaming`（生成中）/ `paused`（运行在等用户回答一个中断，回答后**同一条消息**继续，见 4.8）/ `complete`（正常结束）/ `interrupted`（中途停止，已产出的内容保留）/ `error`（没有可用内容，`fallbackText` 说明原因） |
 | `blocks` | ✅ | 内容块，最多 64 个 |
 | `fallbackText` | ✅ | **整条消息的纯文本版本，任何状态下都必须有**。用于只会显示文本的客户端、系统通知、读屏、搜索 |
-| `rev` | ✅ | 持久化版本号：生成中为 0；完成时为 1；之后每次变化（例如选项块被回答）+1。**同步时 rev 大的版本获胜** |
-| `steps` | | 运行步骤的精简记录（见 4.7）：每步只有 `id`、`label`、`state`、`durationMs`，以及可选的 `summary`、`blockId`。**与 `blocks` 分开存放**，不占块位置、不计入 `blockCount`、不进 `fallbackText`；没有步骤时省略。只出现在助手 / 系统消息上 |
+| `rev` | ✅ | 持久化版本号：没结束时（生成中、暂停中）为 0；完成时为 1；之后每次变化（例如选项块被回答）+1。**同步时 rev 大的版本获胜** |
+| `lastSeq` | | 只出现在没结束的消息的检查点上（`rev = 0`）：这个版本折叠到了哪个 `seq`。暂停中必填。同步下来的检查点只有在 `lastSeq ≥ 本地已应用 seq` 时才替换本地状态（4.8） |
+| `interrupt` | | 只在 `paused` 时出现，且必须出现：运行正在等的那个中断 `{id, stepId, blockId, reason}`（4.8） |
+| `steps` | | 运行步骤的精简记录（见 4.7）：每步只有 `id`、`label`、`state`、`durationMs`，以及可选的 `summary`、`blockId`（这一步向用户提问用的交互块）、`kind`（`delegate` = 交给子 Agent）、`parentStepId`（子 Agent 的步骤挂在哪个委派步骤下）。**与 `blocks` 分开存放**，不占块位置、不计入 `blockCount`、不进 `fallbackText`；没有步骤时省略。只出现在助手 / 系统消息上 |
 | `metadata` | | 宿主自用的不透明数据（如追踪 ID），库不渲染 |
 | `view` | | **保留**给 Phase 2 的 View 协议，0.1 中不得出现 |
 
-**持久化版本优先**：流式过程中客户端在内存里拼出的消息只是临时状态；服务端在 `message.end` 时持久化最终消息，经宿主的同步机制下发。断线重连或离线之后，**以持久化版本为准**，临时状态被整体替换。
+**持久化版本优先**：流式过程中客户端在内存里拼出的消息只是临时状态；服务端在 `message.end` 时持久化最终消息，经宿主的同步机制下发。断线重连或离线之后，**以持久化版本为准**，临时状态被整体替换。暂停中的消息还没有结束，它的检查点（`rev = 0`、带 `lastSeq`）同样必须持久化，规则见 4.8。
 
 **用户消息的 ID 由发送端生成，乐观副本按同一个 `id` 对账**（[D43](decisions.md)，取代早期草案里单独的 `clientMessageId` 字段）：
 
@@ -208,7 +210,12 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 ```
 2–10 个选项。`state` 由服务端维护：服务端记录答案后经 `block.patch` 变成 `{"status":"resolved","selected":["bj"],"resolvedBy":"member_7","resolvedAt":"2026-10-26T09:31:11Z"}`，所有设备都会看到同一个“已回答”结果（交互块状态的完整规则见 3.4）。
 
-`allowFreeText: true` 表示除了点选项，用户也可以**直接在输入框里用文字回答**：这条回答作为一条**普通用户消息**发出，不走动作通道；宿主把它关联到这个仍为 `open` 的块，并在服务端把块写成 `resolved`（`freeText` 记录回答文本）。动作请求里只能带选项。
+`allowFreeText: true` 表示除了点选项，用户也可以**直接用文字回答**。文字回答怎么提交，看这个块属于哪种“问”（4.8）：
+
+- 块是**中断**的提问（消息 `paused`，`interrupt.blockId` 指向它）：文字回答是这个中断的结果，**不是**一条聊天消息，经动作通道提交 `choice.select {freeText}`，显示在卡片上（[D55](decisions.md)）。
+- 块在一条**已经结束**的消息里（最终回答里附带的问题）：文字回答作为一条**普通用户消息**发出，不走动作通道；宿主把它关联到这个仍为 `open` 的块，并在服务端把块写成 `resolved`（`freeText` 记录回答文本）（[D22](decisions.md)）。
+
+两种情况下块的 `state.freeText` 都记录回答文本。
 
 #### `confirmation`（交互块）
 
@@ -266,13 +273,13 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 **谁、为什么**（[D45](decisions.md)）：
 
 - `resolvedBy`（宿主的不透明成员 ID）记录**用户**给出的答案是谁给的，包括用户在确认卡上点“取消”（`resolved` + `outcome: "cancel"`）。一对一会话里它就是那位用户，宿主也可以省略。
-- `cancelled` / `expired` / `superseded` 是**服务端**造成的结束，不得带 `resolvedBy`。`cancelled` 必须带 `reason{code, text?}`，`expired` / `superseded` 可以带：`code` 取 `withdrawn`（服务端撤回）、`policy`（服务端策略拒绝）、`record_changed`、`record_deleted`、`permission_changed`、`other`；`text` 是可以直接给用户看的简短说明。这样界面能区分“你取消了”和“系统已作废”。
+- `cancelled` / `expired` / `superseded` 是**服务端**造成的结束，不得带 `resolvedBy`。`cancelled` 必须带 `reason{code, text?}`，`expired` / `superseded` 可以带：`code` 取 `withdrawn`（服务端撤回）、`policy`（服务端策略拒绝）、`record_changed`、`record_deleted`、`permission_changed`、`stopped`（消息暂停在这个块的中断上时被停止，包括用户没回答、直接发了新消息，见 4.8）、`other`；`text` 是可以直接给用户看的简短说明。这样界面能区分“你取消了”和“系统已作废”。
 
 规则（所有场景）：
 
 1. **不乐观显示结果。** 用户点下去之后，客户端只显示“提交中”（离线排队时显示“已排队，联网后提交”），**不**把自己点的选项先画成“已选择”。只有收到服务端的 `ActionResult.patches`、流里的 `block.patch`，或宿主同步下来的更高 `rev` 时，才显示结果。“提交中 / 已排队”是客户端本地的显示状态，**不属于协议**，也不会出现在 `state.status` 里。
    为什么一对一也要这样：服务端可能拒绝这次操作——当前用户没有权限、块引用的记录已经被改动或删除、表单值没通过校验、块已过期；同一用户也可能在另一台设备上已经回答过。先画“已选择”再回退，会让用户以为已经生效。
-2. 一旦离开 `open`，块不再接受任何动作；拒绝时结果带块的当前状态（见第 5 节）。
+2. 一旦离开 `open`，块不再接受任何动作；拒绝时结果带块的当前状态（见第 5 节）。块所在的消息还没结束时（中断的块），当前状态不靠 `rev` 补丁传递，而是在这条消息的流（或快照）里，结果用 `resume` 指向这条消息（4.8）。
 
 **群聊场景：并发回答（先答者胜）。** 群聊里同一个块会同时出现在多位成员面前。服务端以**第一个被记录的答案**为准；后到的请求被拒绝（`already_resolved`，或块已被取代时 `superseded`、已过期时 `expired`），结果里**必须**带上块的当前状态（`patches`），客户端据此显示服务端的真实结果（例如“已由另一位成员选择‘北京’”），而不是自己刚才点的那个。一对一会话里同一机制照样生效：同一用户在两台设备上几乎同时作答时，后到的那台设备显示先记录的答案。
 
@@ -287,7 +294,7 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 | `protocolVersion` | 如 `"0.1"` |
 | `type` | 事件类型，见下表 |
 | `messageId` | 所属消息 |
-| `seq` | **每条消息从 1 开始、每个事件严格 +1** 的序号。临时事件（`message.activity`，见 4.5）**没有** `seq`；运行步骤事件（4.7）和块事件一样**有** `seq` |
+| `seq` | **每条消息从 1 开始、每个事件严格 +1** 的序号。临时事件（`message.activity`，见 4.5）**没有** `seq`；运行步骤事件（4.7）、暂停 / 继续事件（4.8）和块事件一样**有** `seq`。消息暂停后继续，`seq` 接着往下数，不重新开始 |
 | `ts` | 可选，服务端时间 |
 
 ### 4.2 事件类型
@@ -301,11 +308,13 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 | `block.patch` | `blockId`、`patch`、`rev?` | 按块 ID 局部更新：对 `{data, fallbackText, metadata}` 做 JSON Merge Patch |
 | `block.end` | `blockId`、`status`（`complete`/`error`）、`fallbackText?`、`error?` | 块结束；组件块失败时给出兜底文本 |
 | `message.end` | `status`、`fallbackText`、`blockCount`、`rev`、`error?` | 消息结束，最终版本已持久化 |
+| `message.paused` | `interrupt{id, stepId, blockId, reason}`、`fallbackText`、`blockCount` | 运行在等用户回答（中断），消息暂停；服务端持久化暂停检查点后关闭流（4.8）。对应 AG-UI 的 `RUN_FINISHED{outcome: interrupt}` |
+| `message.resumed` | `interruptId` | 中断已被回答，同一条消息继续（4.8）。对应 AG-UI 带 `resume` 的新一次运行的 `RUN_STARTED` |
 | `message.snapshot` | `message`（完整消息） | 续传时无法按序重放、或服务端不保留事件日志时，直接发完整状态 |
 | `error` | `error{code, message, retryable}`、`blockId?` | 流级错误 |
 | `message.activity` | `activity{phase, label?}`，**无 `seq`** | 临时进度提示，只用于显示（见 4.5） |
-| `step.started` | `stepId`、`label` | 一个运行步骤开始（`running`），见 4.7。对应 AG-UI 的 `STEP_STARTED` |
-| `step.finished` | `stepId`、`state`、`durationMs`、`summary?`、`blockId?` | 这个步骤结束：`succeeded` / `failed` / `awaiting_user` / `cancelled`。对应 AG-UI 的 `STEP_FINISHED` |
+| `step.started` | `stepId`、`label`、`kind?`、`parentStepId?` | 一个运行步骤开始（`running`），见 4.7；`kind: delegate` 表示交给子 Agent，子 Agent 的步骤用 `parentStepId` 挂在它下面。对应 AG-UI 的 `STEP_STARTED`（委派步骤另对应 `SUBAGENT_STARTED`） |
+| `step.finished` | `stepId`、`state`、`durationMs`、`summary?` | 这个步骤结束：`succeeded` / `failed` / `cancelled`。等用户不是结束（见 4.8）。对应 AG-UI 的 `STEP_FINISHED`（委派步骤另对应 `SUBAGENT_FINISHED` / `SUBAGENT_ERROR`） |
 
 **JSON Merge Patch**（RFC 7396，“合并补丁”）：补丁对象里出现的字段覆盖原值，值为 `null` 表示删除该字段，数组整体替换。它比逐条操作的 JSON Patch（RFC 6902）简单，足够表达 v1 的状态更新。
 
@@ -319,7 +328,7 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 ### 4.4 顺序、幂等与修订号
 
 - **`seq`（流内顺序）**：消费方记住每条消息最后应用的 `seq`；收到 `seq ≤ 已应用` 的事件直接丢弃（幂等）；收到跳号（`seq > 已应用 + 1`）就断开并带上已应用的 `seq` 重连续传，不尝试“先放着等补齐”。
-- **`rev`（持久化版本）**：消息完成后发生的变化（例如选项块被回答）带 `rev`。规则：`rev == 本地 rev + 1` 才应用；`≤ 本地 rev` 忽略；跳号则向宿主存储 / 同步重新取整条消息。
+- **`rev`（持久化版本）**：消息完成后发生的变化（例如选项块被回答）带 `rev`。规则：`rev == 本地 rev + 1` 才应用；`≤ 本地 rev` 忽略；跳号则向宿主存储 / 同步重新取整条消息。消息还没结束时（生成中、暂停中）的块变化（例如中断的块被回答）是流里普通的 `block.patch`，只按 `seq`，不带 `rev`。
 - 未知事件类型：忽略内容但照常推进 `seq`。
 - 没有 `seq` 的事件只能是临时事件（4.5），不参与以上规则。
 
@@ -343,45 +352,108 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 这三件事不是块上的动作，不走 Action 协议；端点路径由宿主决定，库提供处理函数与 Schema（[`generation.schema.json`](../schemas/v0.1/generation.schema.json)）。流式细节见 [streaming.md 第 4 节](streaming.md#4-断线续传)。
 
 1. **开始：同步返回助手消息 ID**（[D41](decisions.md)）。宿主的“提交用户消息”接口**必须**在生成开始前返回 `{userMessageId, messageId, streamable}`（`messageId` 是这次回复的助手消息 ID）。同一个用户消息 ID 重复提交（例如离线重发、超时重试）返回同一个 `messageId`，`replayed: true`，不会开始第二次生成。
-2. **停止：显式请求，与断线严格区分**（[D39](decisions.md)）。`POST {宿主前缀}/messages/{messageId}/stop`，幂等。服务端取消生成，持久化已产出的部分，发 `message.end{status: "interrupted", error.code: "cancelled"}`；响应 `{messageId, status: "stopping" | "already_ended"}`。**关闭连接、切后台、离开页面、App 被杀都只是断线**，不是停止，生成照常继续，之后可以续传。谁能停止由宿主授权（例如只允许发起这一轮的用户）。
-3. **找回：按会话查询正在生成的消息**（[D41](decisions.md)）。`GET {宿主前缀}/conversations/{conversationId}/active-messages` → `{conversationId, messages: [{messageId, lastSeq, replyTo?}]}`，没有就返回空列表。用于“提交了用户消息、还没收到助手消息 ID 时 App 就被杀”的空窗：重启后先查一次，再按 `messageId` 续传。群聊里同一会话可能同时有几条在生成，所以是列表。
+2. **停止：显式请求，与断线严格区分**（[D39](decisions.md)）。`POST {宿主前缀}/messages/{messageId}/stop`，幂等。服务端取消生成，持久化已产出的部分，发 `message.end{status: "interrupted", error.code: "cancelled"}`；响应 `{messageId, status: "stopping" | "already_ended"}`。暂停中的消息同样可以停止（4.8）。**关闭连接、切后台、离开页面、App 被杀都只是断线**，不是停止，生成照常继续，之后可以续传。谁能停止由宿主授权（例如只允许发起这一轮的用户）。
+3. **找回：按会话查询正在生成的消息**（[D41](decisions.md)）。`GET {宿主前缀}/conversations/{conversationId}/active-messages` → `{conversationId, messages: [{messageId, lastSeq, replyTo?, status?}]}`，列出还没结束的消息（`status` 为 `streaming`（默认）或 `paused`），没有就返回空列表。用于“提交了用户消息、还没收到助手消息 ID 时 App 就被杀”的空窗：重启后先查一次，再按 `messageId` 续传。群聊里同一会话可能同时有几条在生成，所以是列表。
 
 ### 4.7 运行步骤（`step.started` / `step.finished`）
 
-助手回答之前常常要先做几件事：查数据、对比、等用户确认。步骤事件让界面在这条消息顶部显示一条“过程”，告诉用户 AI 正在做什么、做完了哪些（[D48](decisions.md)–[D52](decisions.md)；界面见 [rendering.md 4.3](rendering.md#43-运行过程条processstrip)）。事件名和字段对齐 AG-UI 1.0 的 `STEP_STARTED` / `STEP_FINISHED`，差异逐条列在 [10.1](#101-运行过程事件对齐-ag-ui)。
+助手回答之前常常要先做几件事：查数据、对比、等用户确认。步骤事件让界面在这条消息顶部显示一条“过程”，告诉用户 AI 正在做什么、做完了哪些（[D48](decisions.md)–[D52](decisions.md)、[D58](decisions.md)；界面见 [rendering.md 4.3](rendering.md#43-运行过程条processstrip)）。事件名和字段对齐 AG-UI 1.0 的 `STEP_STARTED` / `STEP_FINISHED`，差异逐条列在 [10.1](#101-运行过程事件对齐-ag-ui)。
 
 ```json
 {"protocolVersion":"0.1","type":"step.started","messageId":"msg_02","seq":2,"stepId":"s1","label":"查北京本周天气"}
 {"protocolVersion":"0.1","type":"step.started","messageId":"msg_02","seq":3,"stepId":"s2","label":"查上海本周天气"}
 {"protocolVersion":"0.1","type":"step.finished","messageId":"msg_02","seq":4,"stepId":"s1","state":"succeeded","durationMs":800}
 {"protocolVersion":"0.1","type":"step.finished","messageId":"msg_02","seq":5,"stepId":"s2","state":"failed","durationMs":1200,"summary":"天气服务暂时不可用"}
-{"protocolVersion":"0.1","type":"step.finished","messageId":"msg_03","seq":6,"stepId":"s1","state":"awaiting_user","durationMs":300,"blockId":"b2"}
+{"protocolVersion":"0.1","type":"step.started","messageId":"msg_04","seq":2,"stepId":"s1","label":"交给天气助手对比两城天气","kind":"delegate"}
+{"protocolVersion":"0.1","type":"step.started","messageId":"msg_04","seq":3,"stepId":"s2","label":"查北京本周天气","parentStepId":"s1"}
 ```
 
-前四行是两个并行的查询，一个成功、一个失败；最后一行来自另一条消息：删除待办之前等用户在确认卡 `b2` 上确认。完整的事件序列与折叠结果见 [streaming.md 2.5](streaming.md#25-运行步骤)。
+前四行是两个并行的查询，一个成功、一个失败；后两行来自另一条消息：主 Agent 把“对比两城天气”交给一个子 Agent，子 Agent 自己的步骤挂在委派步骤下面。完整的事件序列与折叠结果见 [streaming.md 2.5](streaming.md#25-运行步骤) 与 [2.7](streaming.md#27-子-agent-的步骤嵌套)；等用户确认的步骤见 4.8。
+
+**Agent 的形态**：宿主的 Agent 通常是一个 ReAct 循环（思考 → 调用工具 → 看结果 → 再思考……），可以有一个主 Agent 和若干子 Agent（主从结构：主 Agent 把一部分工作委派给子 Agent，子 Agent 自己也是一个循环）。ChatWeave 不规定宿主怎么实现 Agent，只规定它们在过程条上怎么表达：每次工具调用（或宿主认为值得告诉用户的一件事）是一个步骤；一次委派是一个 `kind: "delegate"` 的步骤，子 Agent 的步骤是它的子步骤。
 
 **字段**
 
-- `stepId`：在这条消息内唯一且稳定，用来把开始和结束配成一对。
-- `label`：**宿主写的**、给人看的一句话（最长 60 字符），例如“查北京本周天气”“对比上周”。宿主为每种工具 / 处理预先写好标签，可以填入经过整理的对象名（如城市名）；它**不是**工具名、调用参数，也不是模型输出。
-- `state`（只在 `step.finished` 上）：`succeeded`（完成）/ `failed`（失败）/ `awaiting_user`（这一步要等用户回答或确认，运行在这里交给用户；**必须**带 `blockId`）/ `cancelled`（用户停止生成时还在运行）。`step.started` 本身就表示 `running`。
-- `durationMs`：这一步从开始到结束的毫秒数。它是时长，不是时间点，不受第 1 节“时间只用 RFC 3339”的约束。
+- `stepId`：在这条消息内唯一且稳定，用来把开始和结束配成一对，也用来被子步骤引用。
+- `label`：**宿主写的**、给人看的一句话（最长 60 字符），例如“查北京本周天气”“交给天气助手对比两城天气”。宿主为每种工具 / 处理 / 子 Agent 预先写好标签，可以填入经过整理的对象名（如城市名）；它**不是**工具名、子 Agent 的内部名字、调用参数，也不是模型输出。
+- `kind`（只在 `step.started` 上，可选）：`delegate` 表示这一步是把工作交给一个子 Agent。没有这个字段就是普通步骤。
+- `parentStepId`（只在 `step.started` 上，可选）：子 Agent 的步骤指向它所在的委派步骤。主 Agent 自己的步骤不带。
+- `state`（只在 `step.finished` 上）：`succeeded`（完成）/ `failed`（失败）/ `cancelled`（用户停止生成、或中断过期时还没完成）。`step.started` 本身就表示 `running`。等用户回答**不是**结束状态：它由 `message.paused` / `message.resumed` 表达（4.8），那一步在暂停期间是 `awaiting_user`，回答后回到 `running`，最后照常 `step.finished`。
+- `durationMs`：这一步的工作时长（毫秒），**不含**暂停等用户的时间。它是时长，不是时间点，不受第 1 节“时间只用 RFC 3339”的约束。
 - `summary`（可选，最长 120 字符）：宿主按工具提供的一行结果说明，例如“找到 3 件待办”“天气服务暂时不可用”，由宿主模板生成。**原始查询结果不下发**。
-- `blockId`（只用于 `awaiting_user`）：指向**正文里**等待用户的交互块（`choice` / `confirmation` / `form_intent`）。确认卡、选项本身在正文里，过程条里只显示“等你确认 / 等你回答”。
 
 **规则**
 
-1. **每个步骤只结束一次**，结束后不再变化。生产方在 `message.end` 之前**必须**为每个已开始的步骤发出 `step.finished`：用户按停止时仍在运行的步骤记为 `cancelled`。已结束的消息里不会有 `running` 的步骤；服务端崩溃后按检查点或日志恢复时，仍在运行的步骤记为 `failed`。
-2. **失败只影响自己这一行**：一个步骤 `failed` 不影响其他步骤，也不会让消息失败；消息是否成功只看 `message.end.status`。宿主通常会让 Agent 带着“这一步没查到”继续回答。
-3. **可以并行**：多个步骤可以同时处于 `running`。显示顺序 = `step.started` 的顺序。v1 只有一层，没有子步骤。
-4. **带 `seq`，和块事件一样可靠**：写事件日志、续传时重放、进快照（`message.snapshot` 里的 `message.steps`，生成中可能含 `running`）。`fold(events) == 持久化消息` 包括步骤：`step.started` 追加 `{id, label, state: "running"}`，`step.finished` 把这一项改成最终状态并写入 `durationMs`、`summary`、`blockId`。对未开始的步骤发 `step.finished`、重复的 `stepId` 开始，都按协议错误处理（与块相同）。
-5. **与内容分开**：步骤折叠进消息的 `steps` 字段，不是内容块：不占 `index`，不计入 `blockCount`，不进 `fallbackText`。只会显示文本的客户端、通知、搜索都看不到过程。
-6. **持久化的只是精简记录**：`message.end` 时随消息保存的每一步只有 `id`、`label`、最终 `state`、`durationMs`，以及可选的 `summary`、`blockId`。**不含**工具名、参数、原始数据或模型文字。
-7. **不传模型的思考过程**：模型的推理 / 思考文字（AG-UI 的 `REASONING_*`）**从不**下发，不进事件、事件日志或消息，也不用来生成 `label` / `summary`。
-8. **等用户确认**：`awaiting_user` 是这一轮运行的终点——运行挂起，消息照常结束（通常 `complete`）。用户回答后，客户端按 `blockId` 指向的块的**当前状态**显示这一行（`open` 时“等你确认”，之后“已确认 / 已回答 / 已取消 / 已过期”），步骤记录本身保持 `awaiting_user` 不变，不需要再补丁。回答之后的继续执行是新的一轮（动作结果里的 `followUp` 消息），有自己的步骤。
-9. **对所有订阅者都发出**：步骤事件带 `seq`，按接收者删掉会造成跳号。没声明 `stream.steps` 能力（7.2）的客户端把它们当作未知事件类型：忽略内容、照常推进 `seq`；持久化消息里的 `steps` 字段同样忽略（宽进严出）。内容照常显示。服务端可以为这类客户端额外发 `message.activity{phase: "working", label: 当前步骤的 label}`，让它们仍能看到一句提示；对声明了 `stream.steps` 的客户端不必再发重复的提示。
-10. **与 `message.activity` 的关系**：有步骤正在运行时，客户端以步骤为准，不再单独显示 activity 提示；没有正在运行的步骤时（例如第一个步骤之前、步骤之间模型在组织回答时）照常显示 activity。
-11. **按接收者替换，不删除（仅群聊）**：步骤细节对谁可见由宿主按接收者决定（[security.md 第 6 节](security.md#6-隐私)）。要对某位接收者隐藏细节时，宿主**替换**而不是删除：把 `label` 换成笼统的说法（如“处理一项请求”），去掉 `summary`，事件条数和 `seq` 保持不变；同步下发的 `steps` 也同样处理。一对一会话只有一位用户，不存在这个问题。
+1. **每个步骤只结束一次**，结束后不再变化。生产方在 `message.end` 之前**必须**为每个已开始的步骤发出 `step.finished`：用户按停止时仍在运行或等待的步骤记为 `cancelled`。已结束的消息里不会有 `running` 或 `awaiting_user` 的步骤；服务端崩溃后按检查点或日志恢复时，仍在运行的步骤记为 `failed`（暂停中的消息不受崩溃影响，见 4.8）。
+2. **失败只影响自己这一行**：一个步骤 `failed` 不影响其他步骤，也不会让消息失败；消息是否成功只看 `message.end.status`。宿主通常会让 Agent 带着“这一步没查到”继续回答。子 Agent 的某一步失败也只标那一行；委派步骤本身成功与否由宿主按子 Agent 的结果决定。
+3. **可以并行**：多个步骤可以同时处于 `running`（包括几个子 Agent 同时在跑）。同一层里的显示顺序 = `step.started` 的顺序。
+4. **可以嵌套（子 Agent）**：`parentStepId` **必须**指向这条消息里**更早开始**、`kind` 为 `delegate`、而且还在运行的步骤（所以不会出现环）；嵌套最多 3 层（主 Agent 的步骤是第 1 层）。委派步骤要等它的所有子步骤都结束之后才能结束（停止时先结束子步骤、再结束委派步骤）。普通步骤不能有子步骤。违反这些按协议错误处理。
+5. **带 `seq`，和块事件一样可靠**：写事件日志、续传时重放、进快照（`message.snapshot` 里的 `message.steps`，生成中可能含 `running`，暂停中含 `awaiting_user`）。`fold(events) == 持久化消息` 包括步骤：`step.started` 追加 `{id, label, kind?, parentStepId?, state: "running"}`，`message.paused` 把中断的那一步改成 `awaiting_user` 并写入 `blockId`，`message.resumed` 把它改回 `running`，`step.finished` 把这一项改成最终状态并写入 `durationMs`、`summary`。对未开始的步骤发 `step.finished`、重复的 `stepId` 开始，都按协议错误处理（与块相同）。
+6. **与内容分开**：步骤折叠进消息的 `steps` 字段，不是内容块：不占 `index`，不计入 `blockCount`，不进 `fallbackText`。只会显示文本的客户端、通知、搜索都看不到过程。
+7. **持久化的只是精简记录**：`message.end` 时随消息保存的每一步只有 `id`、`label`、最终 `state`、`durationMs`，以及可选的 `summary`、`blockId`（这一步曾经通过哪个交互块问过用户）、`kind`、`parentStepId`。**不含**工具名、子 Agent 的内部名字、参数、原始数据或模型文字。
+8. **不传模型的思考过程**：模型的推理 / 思考文字（AG-UI 的 `REASONING_*`）**从不**下发，不进事件、事件日志或消息，也不用来生成 `label` / `summary`。子 Agent 的思考文字同样不下发。
+9. **等用户确认 / 回答**：运行中某一步需要用户确认或回答时，运行**暂停**，同一条消息在回答后继续，这一步从“等你确认”回到运行、最后照常结束。完整规则见 4.8。最终回答里附带的问题不是这种情况（4.8 开头）。
+10. **对所有订阅者都发出**：步骤事件带 `seq`，按接收者删掉会造成跳号。没声明 `stream.steps` 能力（7.2）的客户端把它们当作未知事件类型：忽略内容、照常推进 `seq`；持久化消息里的 `steps` 字段同样忽略（宽进严出）。内容照常显示。服务端可以为这类客户端额外发 `message.activity{phase: "working", label: 当前步骤的 label}`，让它们仍能看到一句提示；对声明了 `stream.steps` 的客户端不必再发重复的提示。不认识 `parentStepId` 的旧客户端按宽进严出忽略它，把所有步骤平铺显示。
+11. **与 `message.activity` 的关系**：有步骤正在运行时，客户端以步骤为准，不再单独显示 activity 提示；没有正在运行的步骤时（例如第一个步骤之前、步骤之间模型在组织回答时）照常显示 activity。
+12. **按接收者替换，不删除（仅群聊）**：步骤细节对谁可见由宿主按接收者决定（[security.md 第 6 节](security.md#6-隐私)）。要对某位接收者隐藏细节时，宿主**替换**而不是删除：把 `label` 换成笼统的说法（如“处理一项请求”），去掉 `summary`，事件条数、`seq`、`kind` 和 `parentStepId` 保持不变；同步下发的 `steps` 也同样处理。一对一会话只有一位用户，不存在这个问题。
+
+### 4.8 中断：暂停与继续（同一条消息）
+
+助手问用户问题有两种情况，处理方式不同（[D53](decisions.md)）：
+
+| | (a) **中断**：运行中途要用户确认或回答 | (b) **最终回答里带着问题** |
+|---|---|---|
+| 例子 | 某个工具调用被系统拦下、要用户确认（例如修改或删除一条记录之前）；运行中途 `ask_user` 澄清（“要查哪个城市？”） | 回答已经写完，最后问一句“要我给‘交水费’设个提醒吗？” |
+| 运行 | **没有结束**：同一条助手消息**暂停**，回答后在同一条消息、同一条过程条里**继续** | 已经结束（`message.end`） |
+| 用户的回答 | 是这一步的**结果**，不是一条新的聊天消息（显示在卡片 / 这一步上） | 一条**新的用户消息**，随后是一条**新的助手消息** |
+| 协议 | `message.paused` → 回答 → `message.resumed`，`seq` 接着数 | 照旧：普通消息，或块上的动作 + `followUp` 新消息 |
+
+本节只讲 (a)。(b) 不需要任何新机制。
+
+**生命周期**
+
+```
+streaming ──message.paused──▶ paused ──(回答) block.patch + message.resumed──▶ streaming ──…──▶ message.end（complete）
+                                 │
+                                 ├─(停止 / 发了新消息) block.patch(cancelled, stopped) + step.finished(cancelled)… + message.end(interrupted, cancelled)
+                                 └─(过期) block.patch(expired) + step.finished(cancelled)… + message.end(interrupted, interrupt_expired)
+```
+
+同一条消息可以暂停多次（例如先问城市、后确认删除），每次只等一个中断（[D57](decisions.md)）。
+
+**暂停（`message.paused`）**
+
+```json
+{"protocolVersion":"0.1","type":"message.paused","messageId":"msg_03","seq":6,"interrupt":{"id":"int_01","stepId":"s1","blockId":"b1","reason":"confirmation"},"fallbackText":"删除待办“交水费”？删除后无法恢复。","blockCount":1}
+{"protocolVersion":"0.1","type":"message.resumed","messageId":"msg_03","seq":8,"interruptId":"int_01"}
+```
+
+1. **前提**：中断的交互块（`choice` / `confirmation` / `form_intent`，状态 `open`）已经完整发出（`block.data` + `block.end`）；所有已开始的块都已结束；除了中断的那一步和它上面的委派步骤（子 Agent 里发起的中断，见第 9 条），没有其他步骤在运行——并行的其他工具调用先跑完。
+2. `interrupt`：`id`（不透明，消息内唯一）、`stepId`（发起中断的那一步）、`blockId`（正文里的交互块，问题本身在块里）、`reason`（`confirmation` = 确认或拒绝一个操作；`input_required` = 需要用户回答。取值对齐 AG-UI 的核心 reason）。过期时间取块的 `action.expiresAt`，不在这里重复。
+3. **折叠**：消息 `status` 变成 `paused`，带上 `interrupt`；那一步变成 `awaiting_user` 并写入 `blockId`；`fallbackText` 是到目前为止的纯文本（含问题），给只会显示文本的客户端和通知用。
+4. **持久化**：服务端在发出 `message.paused` 的同时（同一事务或等价的条件写入）把暂停检查点写进消息存储：折叠后的消息（`status: paused`、`rev: 0`、`lastSeq` = 这个事件的 `seq`）。暂停可能持续几小时甚至几天，检查点是它的权威状态，**不依赖**事件日志或进程内缓冲；服务端重启不影响暂停中的消息。
+5. **关闭流**：发出 `message.paused` 后服务端关闭这条 SSE 连接（像 `message.end` 一样）。客户端进入“已暂停”状态，**不自动重连**——这时没有东西可等；打开会话、回到前台等续传触发时机（[streaming.md 4.3](streaming.md#43-客户端续传状态机)）对暂停中的消息不生效。
+6. **暂停中订阅**：有客户端在暂停中订阅这条消息（例如另一台设备刚打开会话）时，服务端照常从日志重放 `seq > N` 的事件（日志没有了就发快照），以 `message.paused`（或暂停中的快照）结束，然后关闭。
+7. **事件日志的保留期从 `message.paused` 起算**（默认 10 分钟，同 [D21](decisions.md)）：过期后可以清掉日志，之后的订阅拿到暂停检查点的快照，再接着收继续之后的事件。**暂停中的消息本身不会因为日志过期而失去继续的能力**——继续只依赖检查点和宿主的运行时状态。
+8. **找回与同步**：暂停中的消息出现在活动消息列表里（`status: "paused"`，4.6），另一台设备据此显示问题、回答后订阅。宿主也可以把暂停检查点同步下发；客户端收到 `rev = 0` 的检查点时，只有 `lastSeq ≥ 本地已应用 seq` 才替换本地状态（检查点不会让本地状态倒退）。
+9. **子 Agent 里的中断**：中断可以由子 Agent 的某一步发起（它的 `stepId` 是子步骤）。**整条消息暂停**，不只是子 Agent：那一步是 `awaiting_user`，它上面的委派步骤保持 `running`（界面上显示为“等你确认”，见 [rendering.md 4.3](rendering.md#43-运行过程条processstrip)）。
+
+**回答与继续（`message.resumed`）**
+
+10. **回答就是中断的结果**：用户在中断的块上操作（选项、确认 / 取消、表单），客户端照常发动作请求（第 5 节，幂等键规则不变）。`choice` 的文字回答也走动作通道：`choice.select {freeText}`，只对中断的、`allowFreeText: true` 的块有效（3.2）。回答**不会**变成一条用户消息；它记在块的 `state` 里（`resolved`、`selected` / `outcome` / `values` / `freeText`），显示在卡片上和这一步上。用户在确认卡上点“取消”也是一个回答（`outcome: cancel`），运行照样继续，由 Agent 决定接下来怎么说。
+11. **服务端**：dispatcher 按第 5.2 节校验；第 7 步对中断的块是：在同一个事务（或条件写入）里检查“消息仍是 `paused`、中断仍未回答、块仍是 `open`”→ 记录答案 → 把答案作为这次中断的结果交给宿主的 Agent 运行时（宿主把它当作那次工具调用的结果，例如 `ask_user` 的返回值或“已确认，可以执行”）。返回 `ActionResult{status: "accepted", resume: {messageId}}`，**不带** `patches`、不加 `rev`（消息还没结束）。
+12. **流里的顺序**：继续时服务端先发记录答案的 `block.patch`（块 → `resolved`，不带 `rev`），紧接着发 `message.resumed{interruptId}`；之后运行照常产出事件（那一步回到 `running`，最后 `step.finished`；新的块；`message.end`）。`message.resumed` **必须**紧跟在把中断的块写成 `resolved` 的 `block.patch` 之后。
+13. **客户端**：收到 `resume` 后按已应用的 `seq` 重新订阅这条消息（`Last-Event-ID = 已应用 seq`）；在收到 `block.patch` 之前，块照常只显示“提交中”（[D18](decisions.md)）。其他设备通过活动消息列表或下一次打开会话时订阅，拿到同样的事件。
+14. **幂等与并发**：同一个动作 ID 重复提交返回第一次的结果（含 `resume`），不会让运行继续两次。另一台设备已经回答过（或已停止、已过期）时，后到的请求被拒（`already_resolved` / `expired`）；如果消息还没结束，结果不带 `patches` 而带 `resume`，客户端订阅后从流（或快照）里看到真实结果；消息已经结束时照常带 `rev` 补丁。
+
+**暂停中停止、发新消息、过期**（[D56](decisions.md)）
+
+15. **停止**：暂停中的消息可以停止（`POST …/stop`，幂等）。服务端在同一个条件写入里关闭中断，然后依次发：中断块的 `block.patch`（→ `cancelled`，`reason.code: "stopped"`）、等待中的那一步及其上面的委派步骤各一个 `step.finished{state: cancelled}`（先子后父）、`message.end{status: interrupted, error.code: cancelled}`，并持久化最终消息（`rev = 1`）。这些事件写进日志；没有人在订阅时，客户端下次打开时从持久化版本拿到结果。
+16. **不回答、直接发新消息**：中断还开着时，用户在输入框里发了新内容——
+    - 中断的块是允许文字回答的 `choice`：输入框的内容就是这个中断的文字回答（第 10 条），不是新消息。界面应在输入框上提示“回答上面的问题”。
+    - 其他情况：宿主的“提交用户消息”接口先对暂停中的消息执行第 15 条的停止（块 `cancelled` + `stopped`），然后照常开始新的一轮。这与 AG-UI“有未回答的中断时，新的输入必须先处理它们”一致。
+17. **过期**：块的 `action.expiresAt` 到了仍没回答，服务端关闭中断：块 → `expired`，步骤 → `cancelled`（同第 15 条的顺序），`message.end{status: interrupted, error.code: interrupt_expired}`。没有 `expiresAt` 的中断不会自己过期（直到停止或发新消息）。过期时间由宿主按场景设定。
+18. **先到者胜**：回答、停止、过期、新消息都要先“检查中断仍开着 → 关闭它”，在同一个事务或条件写入里完成，只有一个会成功。停止请求到达时如果回答已经被接受、消息又在生成了，就按普通的停止处理。
 
 ## 5. Action 协议（v1 最小集合）
 
@@ -412,8 +484,8 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
      - 只有在服务端给出明确的拒绝（`rejected`）、块仍是 `open`、用户重新做了决定时，才生成新 ID。
      - 提交进行中再次点按不产生新请求（防双击）。
    - `context`：只有定位块所需的 ID。**用户是谁、属于哪个租户、有什么权限，一律由宿主在服务端推导，不信任客户端。**
-   - `payload` 按类型：`choice.select` → `{selected: [选项id]}`（自由文本回答走普通消息，见 3.2）；`confirmation.respond` → `{outcome: "confirm" | "cancel"}`；`form.submit` → `{values: {字段key: 值}}`。
-3. **ActionResult（动作结果）**：服务端返回。
+   - `payload` 按类型：`choice.select` → `{selected: [选项id]}`，或者只对中断的、允许文字回答的块用 `{freeText: "…"}`（两者恰好一个；其他块的文字回答走普通消息，见 3.2、4.8）；`confirmation.respond` → `{outcome: "confirm" | "cancel"}`；`form.submit` → `{values: {字段key: 值}}`。
+3. **ActionResult（动作结果）**：服务端返回。块所在的消息已经结束（最终回答里附带的问题）时，结果带 `rev` 补丁，引发的新一轮是一条新消息（`followUp`）：
 
    ```json
    {
@@ -422,6 +494,12 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
      "patches": [ { "messageId": "01J9Z8M5…", "blockId": "b4", "rev": 2, "patch": { "data": { "state": { "status": "resolved", "selected": ["bj"], "resolvedBy": "member_7", "resolvedAt": "2026-10-26T09:31:11Z" } } } } ],
      "followUp": { "messageId": "01J9Z9B7…", "streamable": true }
    }
+   ```
+
+   块是一条暂停中的消息的中断块时（4.8），回答之后**同一条消息**继续：结果不带补丁，用 `resume` 指向这条消息，答案在它的流里以 `block.patch` 到达：
+
+   ```json
+   { "actionId": "01J9Z9D2P5…", "status": "accepted", "resume": { "messageId": "msg_03", "streamable": true } }
    ```
 
    群聊里别人先回答了的情况（客户端据此显示“已由另一位成员选择‘上海’”，而不是自己点的“北京”；一对一时同理，可能是同一用户在另一台设备上先答了）：
@@ -434,13 +512,14 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
      "patches": [ { "messageId": "01J9Z8M5…", "blockId": "b4", "rev": 2, "patch": { "data": { "state": { "status": "resolved", "selected": ["sh"], "resolvedBy": "member_3", "resolvedAt": "2026-10-26T09:31:09Z" } } } } ]
    }
    ```
-   - `status`：`completed`（同步完成）/ `accepted`（已受理，异步执行，例如重新排队一轮 Agent）/ `rejected`（校验、权限或状态不符，原样重试无意义）/ `failed`（执行出错，看 `error.retryable`）。
+   - `status`：`completed`（同步完成）/ `accepted`（已受理，异步执行，例如回答了中断、运行即将继续，或重新排队一轮 Agent）/ `rejected`（校验、权限或状态不符，原样重试无意义）/ `failed`（执行出错，看 `error.retryable`）。
    - `error.code`：`invalid_payload`、`not_found`、`forbidden`、`already_resolved`、`expired`、`superseded`、`confirmation_required`、`target_mismatch`、`conflict`、`rate_limited`、`unavailable`、`unsupported`、`internal`。宿主可以把“无权限”也报成 `not_found`，以免泄露资源存在。几个容易混淆的：
      - `forbidden`：**这个人**不能回答这个块；`conflict`：**业务规则**不允许这次操作（例如状态已变化）。两者给用户的提示不同。
-     - `already_resolved` / `expired` / `superseded`：块已经不是 `open`。结果**必须**带 `patches`，把块更新成服务端的真实状态。
+     - `already_resolved` / `expired` / `superseded`：块已经不是 `open`。结果**必须**带 `patches`，把块更新成服务端的真实状态；块所在的消息还没结束时（中断的块）改为带 `resume`，客户端从那条消息的流或快照拿真实状态（4.8）。
      - `unavailable`：服务端暂时无法给出结论，**动作可能已经执行**。客户端不得把它显示成“失败”，而是显示“暂时无法确认结果”，刷新块状态，必要时用**同一个 ID** 重试。客户端自己的超时同理。
    - `patches`：块状态变化，与流里的 `block.patch` 同形；同步下来的持久化版本 `rev` 相同，重复应用无副作用。客户端只根据 `patches`（或同步版本）显示结果。
-   - `followUp`：动作引发了一条新的助手消息时给出其 ID，客户端可以去订阅它的流。
+   - `resume`：动作回答了一条暂停中的消息的中断，**同一条消息**继续；客户端按已应用的 `seq` 重新订阅它的流（4.8）。这时没有 `patches`，答案作为流里的 `block.patch` 到达。
+   - `followUp`：动作引发了一条新的助手消息时给出其 ID，客户端可以去订阅它的流（块在一条已经结束的消息里时）。`resume` 和 `followUp` 不会同时出现。
 
 ### 5.2 服务端处理顺序（库的 dispatcher 固定执行）
 
@@ -450,7 +529,7 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 4. 处理器标记为破坏性时，请求必须来自 `severity: destructive` 的确认块，且 `outcome = confirm`（否则 `confirmation_required`）。
 5. 幂等检查：同一个 `id` 已有结果则直接返回（`replayed: true`）。
 6. 调用宿主处理器的 `authorize`（宿主自己的权限检查），再调用 `execute`。
-7. 写入块的新状态（`rev + 1`），返回结果与补丁。
+7. 写入块的新状态（`rev + 1`），返回结果与补丁。块是暂停中的消息的中断块时不同：不加 `rev`，答案作为这条消息流里的 `block.patch` 发出，把答案交给宿主的 Agent 运行时继续这一轮，返回 `accepted` + `resume`（4.8 第 11 条）。
 
 第 2 步与第 7 步必须在同一个事务（或等价的条件写入）里完成“检查仍为 `open` → 写入结果”，这样并发的两个答案只有一个能成功，另一个拿到 `already_resolved`。
 
@@ -547,8 +626,11 @@ ChatWeave-Protocol: 0.1
 | `form_intent.fields` / 每字段选项 | 12 / 20 |
 | 普通标签 / 短按钮文字 / 说明文字 | 120 / 24 / 2000 字符 |
 | `fallbackText`（块 / 消息） | 2000 / 16000 字符 |
-| 每条消息的运行步骤 | 32 |
+| 每条消息的运行步骤（含子步骤） | 64 |
+| 步骤嵌套层数 | 3 |
 | 步骤 `label` / `summary` | 60 / 120 字符 |
+| 每次暂停等待的中断 | 1 |
+| `choice.select` 的 `freeText` | 500 字符 |
 
 数量与长度上限写在 Schema 里；字节大小、深度、节点数由库的 `Limits` 校验（Schema 难以表达）。宿主可以把限制**调得更严**，不能调得比协议默认更宽（否则别的消费方可能拒收）。超限时生产方必须截断（并填 `totalRows` 之类的说明）或改发 markdown，不得发出超限块。
 
@@ -571,29 +653,38 @@ ChatWeave-Protocol: 0.1
 
 ### 10.1 运行过程事件：对齐 AG-UI
 
-A2UI 管的是“内容长什么样”，而“Agent 正在做什么”（运行开始 / 结束、步骤、工具调用、思考）是另一个层面的信息，[AG-UI](https://github.com/ag-ui-protocol/ag-ui) 是这方面的协议。ChatWeave v1 展示运行步骤（4.7，[D48](decisions.md)），事件名和字段对齐 **AG-UI 1.0**（协议 1.0 于 2026-09-17 发布，以其仓库中的 `spec/1.0/schema.json` 为准，2026-10-26 核对）。形成“内容对齐 A2UI、过程对齐 AG-UI”的格局。
+A2UI 管的是“内容长什么样”，而“Agent 正在做什么”（运行开始 / 结束、步骤、工具调用、子 Agent、中断、思考）是另一个层面的信息，[AG-UI](https://github.com/ag-ui-protocol/ag-ui) 是这方面的协议。ChatWeave v1 展示运行步骤（4.7，[D48](decisions.md)）并支持中断后在同一条消息里继续（4.8，[D53](decisions.md)），事件名和字段对齐 **AG-UI 1.0**（协议 1.0 于 2026-09-17 发布，以其仓库中的 `spec/1.0/schema.json` 和 Interrupts、Subagents 两篇概念文档为准，2026-10-26 核对）。形成“内容对齐 A2UI、过程对齐 AG-UI”的格局。
 
 | ChatWeave | AG-UI 1.0 | 说明 |
 |---|---|---|
-| `message.start` / `message.end` | `RUN_STARTED` / `RUN_FINISHED`；`RUN_ERROR` | 一条助手消息 = 一次运行。消息以 `awaiting_user` 步骤结束 ≈ `RUN_FINISHED.outcome.type = "interrupt"`；用户停止（`interrupted` + `cancelled`）≈ `outcome.type = "cancelled"` |
+| `message.start` / `message.end` | `RUN_STARTED` / `RUN_FINISHED`；`RUN_ERROR` | 一条助手消息里每一段“开始或继续 → 暂停或结束”对应一次运行（见下方第 9 条）。用户停止（`interrupted` + `cancelled`）≈ `outcome.type = "cancelled"` |
+| `message.paused{interrupt}` | `RUN_FINISHED{outcome: {type: "interrupt", interrupts: [Interrupt]}}` | `Interrupt.id = interrupt.id`，`reason` 相同（`confirmation` / `input_required`），`message` = 块的 `fallbackText`，`expiresAt` = 块的 `action.expiresAt`，`metadata` 放 `stepId`、`blockId`；子 Agent 里发起的中断带 `subagentRunId`（见下） |
+| 动作回答中断 + `message.resumed` | 新一次运行：`RunAgentInput.resume = [{interruptId, status: "resolved", payload}]`，`RUN_STARTED` | `payload` = 动作的 `payload`（`selected` / `freeText` / `outcome` / `values`）；确认卡上点“取消”也是 `resolved`，拒绝写在 `payload` 里（与 AG-UI 一致） |
+| 暂停中停止 / 发新消息 / 过期 | `resume` 里 `status: "cancelled"` 的运行以 `outcome.type = "cancelled"` 结束；过期 ≈ AG-UI 规定的过期答复 `RUN_ERROR` | ChatWeave 都以 `message.end{interrupted}` 结束这条消息（4.8 第 15–17 条） |
 | `step.started{stepId, label}` | `STEP_STARTED{stepName, metadata?}` | 转换时 `stepName = stepId`，`label` 放进 `metadata.label` |
-| `step.finished{stepId, state, durationMs, summary?, blockId?}` | `STEP_FINISHED{stepName, metadata?}` | 转换时 `stepName = stepId`，其余字段放进 `metadata` |
+| `step.finished{stepId, state, durationMs, summary?}` | `STEP_FINISHED{stepName, metadata?}` | 转换时 `stepName = stepId`，其余字段放进 `metadata` |
+| `step.started{kind: "delegate"}` | 再加一个 `SUBAGENT_STARTED{subagentRunId, name, parentSubagentRunId?}` | `subagentRunId` 由委派步骤的 `stepId` 派生（消息内唯一，一次委派一个值）；`name = label`（ChatWeave 不下发子 Agent 的内部名字）；外层还有委派步骤时 `parentSubagentRunId` 指向它 |
+| 子步骤（带 `parentStepId`） | 事件带 `subagentRunId` | 取最近的上层委派步骤派生的 `subagentRunId`；主 Agent 的步骤不带（与 AG-UI“不带即属于父 Agent”一致） |
+| 委派步骤的 `step.finished` | `SUBAGENT_FINISHED`（`succeeded`）/ `SUBAGENT_ERROR`（`failed`，`cancelled` 时 `code: "cancelled"`） | 暂停时还在运行的委派步骤（子 Agent 里有中断）在 `RUN_FINISHED` 之前发 `SUBAGENT_FINISHED{outcome: {type: "suspended", interruptIds}}`；继续时用**同一个** `subagentRunId` 再发 `SUBAGENT_STARTED`（AG-UI 允许并建议挂起的子 Agent 在继续时复用 ID） |
 | （不下发） | `TOOL_CALL_START` / `TOOL_CALL_ARGS` / `TOOL_CALL_END` / `TOOL_CALL_RESULT` / `TOOL_CALL_CHUNK` | 见下方第 5 条 |
 | （不下发） | `REASONING_*`（1.0 已移除旧的 `THINKING_*`） | 见下方第 6 条 |
 | `message.activity` | 无直接对应 | AG-UI 的 `ACTIVITY_SNAPSHOT` / `ACTIVITY_DELTA` 是会留在消息列表里的活动消息；ChatWeave 的 activity 是不进日志、不持久化的临时提示（4.5），两者含义不同，不做映射 |
 
 **与 AG-UI 不同之处（扩展清单）**，每处单列理由：
 
-1. **事件名写法**：`step.started` / `step.finished`（小写、点分），对应 `STEP_STARTED` / `STEP_FINISHED`。理由：与 ChatWeave 已有事件的命名一致；一一对应，适配器只做机械改写。
+1. **事件名写法**：`step.started` / `step.finished`、`message.paused` / `message.resumed`（小写、点分）。理由：与 ChatWeave 已有事件的命名一致；一一对应，适配器只做机械改写。
 2. **外层信封**：用 ChatWeave 的 `protocolVersion`、`messageId`、`seq`、`ts`（RFC 3339），而不是 AG-UI 的 `threadId` / `runId` 与整数 `timestamp`。理由：续传和去重依赖每条消息内的 `seq`（D6）；整个协议只用一种时间编码（D35）。
-3. **用 `stepId` 配对，另设 `label`**：AG-UI 只有 `stepName`，它同时是标识和名字，开始与结束靠名字配对。ChatWeave 同一条消息里可能出现两个同名步骤（例如两次“查天气”），而名字是给人看的、群聊里还可能按接收者被替换（4.7 第 11 条），所以用稳定的 `stepId` 配对，`label` 单独给人看。
-4. **`step.finished` 带结果状态 `state` 和 `durationMs`**：AG-UI 的 `STEP_FINISHED` 只有名字，失败只能通过整个运行的 `RUN_ERROR` 表达。ChatWeave 要求“一步失败只显示在这一行、不影响其他步骤和回答”，还要显示“等你确认”和每一步的耗时，所以结果状态是一等字段（转换成 AG-UI 时放进 `metadata`）。
-5. **不下发工具调用事件**（`TOOL_CALL_*`）：工具名、参数和原始结果是宿主内部信息，可能含业务数据，也不是给用户看的；用户看到的是宿主写的 `label` 和可选的 `summary`。一个步骤对应零个、一个或多个工具调用，由宿主决定。接入只会发 AG-UI 事件的外部 Agent 时，适配器按宿主登记的“工具 → 标签”表把 `TOOL_CALL_START` 翻成 `step.started`、把 `TOOL_CALL_END` / `TOOL_CALL_RESULT` 翻成 `step.finished`，丢弃参数和结果；没登记的工具用宿主的笼统标签。
-6. **不下发推理事件**（`REASONING_*`）：模型的思考文字不展示，也不传输（4.7 第 7 条）。理由：它是未经校验的模型原文，可能复述敏感数据或让用户误以为是结论；对“它做了什么”的理解帮助不大。
+3. **用 `stepId` 配对，另设 `label`**：AG-UI 只有 `stepName`，它同时是标识和名字，开始与结束靠名字配对。ChatWeave 同一条消息里可能出现两个同名步骤（例如两次“查天气”），而名字是给人看的、群聊里还可能按接收者被替换（4.7 第 12 条），所以用稳定的 `stepId` 配对，`label` 单独给人看。
+4. **`step.finished` 带结果状态 `state` 和 `durationMs`**：AG-UI 的 `STEP_FINISHED` 只有名字，失败只能通过整个运行的 `RUN_ERROR` 表达。ChatWeave 要求“一步失败只显示在这一行、不影响其他步骤和回答”，还要显示每一步的耗时，所以结果状态是一等字段（转换成 AG-UI 时放进 `metadata`）。
+5. **不下发工具调用事件**（`TOOL_CALL_*`）：工具名、参数和原始结果是宿主内部信息，可能含业务数据，也不是给用户看的；用户看到的是宿主写的 `label` 和可选的 `summary`。一个步骤对应零个、一个或多个工具调用，由宿主决定。所以中断里也没有 `toolCallId`：AG-UI 的 `reason: "tool_call"` 要求带它，ChatWeave 只用 `confirmation` / `input_required`，被拦下的是哪个工具调用由宿主在服务端按中断 `id` 自己对应。接入只会发 AG-UI 事件的外部 Agent 时，适配器按宿主登记的“工具 → 标签”表把 `TOOL_CALL_START` 翻成 `step.started`、把 `TOOL_CALL_END` / `TOOL_CALL_RESULT` 翻成 `step.finished`，丢弃参数和结果；没登记的工具用宿主的笼统标签。
+6. **不下发推理事件**（`REASONING_*`）：模型的思考文字不展示，也不传输（4.7 第 8 条）。理由：它是未经校验的模型原文，可能复述敏感数据或让用户误以为是结论；对“它做了什么”的理解帮助不大。
 7. **步骤带 `seq`、进事件日志、进持久化消息**：AG-UI 不规定事件的持久化。ChatWeave 的步骤要在续传、快照、同步之后保持一致，并在消息结束后留下精简记录（`message.steps`）。
-8. **没有子 Agent 归属**（AG-UI 的 `subagentRunId`）：v1 的步骤只有一层。
+8. **子 Agent 用步骤树表达，不另设子 Agent 事件**：ChatWeave 没有 `SUBAGENT_*` 事件，委派就是一个 `kind: "delegate"` 的步骤，子 Agent 的工作是它的子步骤（`parentStepId`）。理由：用户关心的是“交给谁做了什么、做到哪了”，一棵步骤树就够表达，也只需要一套续传、折叠和持久化规则；转换成 AG-UI 是机械映射（上表）。比 AG-UI 更严格的地方：子步骤只能挂在还在运行的委派步骤下，委派步骤要等子步骤都结束才能结束（AG-UI 允许父先于子结束）；嵌套最多 3 层。
+9. **暂停与继续是同一条消息、同一个 `seq` 序列**：AG-UI 的中断让本次运行以 `RUN_FINISHED{interrupt}` 结束，继续是带 `resume` 的另一次运行（新的 `runId`）。ChatWeave 里用户看到的是一条消息、一条过程条，所以继续沿用同一个 `messageId`，`seq` 接着数，续传、快照、持久化都不用跨消息拼接。转换成 AG-UI 时每一段对应一次运行（同一个 `threadId`，新的 `runId`）。
+10. **每次暂停只有一个中断**：AG-UI 允许一次带多个中断，并要求一次 `resume` 全部回答。ChatWeave 0.1 每次暂停只等一个（[D57](decisions.md)）；需要问多件事时宿主一件一件问（同一条消息可以多次暂停）。理由：一次只显示一个问题，界面和“部分回答”的状态都简单；转换成 AG-UI 时 `interrupts` 只有一项，仍然合规。
+11. **回答走 ChatWeave 的动作通道**：AG-UI 的回答是下一次 `RunAgentInput` 里的 `resume`；ChatWeave 的回答是对中断块的动作请求（第 5 节），服务端校验、幂等、先到者胜的规则与其他交互块完全相同，答案记在块的 `state` 里，多设备一致。`responseSchema` 不下发：问题的形状就是块本身（选项、确认、表单字段）。
 
-同理，Phase 3 中“确认后在同一轮里交回 Agent 继续”的交互，`ActionSpec` 可以带一个不透明的 `toolCallId`，dispatcher 把用户的回答作为那次工具调用的结果交回宿主的 Agent 运行时，形状上对齐 AG-UI 的中断（`RUN_FINISHED.outcome.interrupt`）模式。0.1 不包含这个字段：v1 里用户回答之后的继续执行是新的一轮（4.7 第 8 条）。
+Phase 3 的完整交互（点击下钻、筛选等）如果需要把用户操作交回 Agent，也沿用 4.8 的中断方式，不再另设字段。
 
 ## 11. 外部 Agent 的兼容
 

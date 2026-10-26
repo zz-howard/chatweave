@@ -70,6 +70,7 @@
       }
     },
     "choiceSelectPayload": {
+      "description": "Exactly one of: selected (option ids from the block) or freeText. freeText is accepted only for the block of an open interrupt that declares allowFreeText (docs/protocol.md 4.8): the typed answer is the interrupt's result, not a chat message. For a choice in a message that has ended, a free-text answer is still a normal user message (D22).",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -79,10 +80,10 @@
           "minItems": 1,
           "maxItems": 10,
           "uniqueItems": true
-        }
+        },
+        "freeText": { "type": "string", "minLength": 1, "maxLength": 500 }
       },
-      "required": ["selected"],
-      "$comment": "Free-text answers to a choice are sent as normal user messages, not through this payload; the host links them to the open block and resolves it server-side."
+      "oneOf": [ { "required": ["selected"] }, { "required": ["freeText"] } ]
     },
     "confirmationRespondPayload": {
       "type": "object",
@@ -220,8 +221,18 @@
           "maxItems": 8,
           "items": { "$ref": "#/$defs/blockPatch" }
         },
+        "resume": {
+          "description": "The action answered the open interrupt of a paused message (docs/protocol.md 4.8): that same message continues. The client (re)subscribes to its stream with Last-Event-ID = its applied seq; the recorded answer arrives there as block.patch, followed by message.resumed. Carries no patches: the message has not ended, so its block changes travel in its stream (or snapshot), not by rev. Mutually exclusive with followUp.",
+          "type": "object",
+          "required": ["messageId"],
+          "additionalProperties": false,
+          "properties": {
+            "messageId": { "$ref": "#/$defs/messageId" },
+            "streamable": { "type": "boolean", "default": true }
+          }
+        },
         "followUp": {
-          "description": "When the action starts a new assistant message (e.g. the agent resumes after a clarification).",
+          "description": "When the action starts a new assistant message (an answer to a block in a message that has already ended). Answers to an interrupt use 'resume' instead.",
           "type": "object",
           "required": ["messageId"],
           "additionalProperties": false,
@@ -247,7 +258,16 @@
             "properties": { "error": { "properties": { "code": { "enum": ["already_resolved", "expired", "superseded"] } }, "required": ["code"] } },
             "required": ["error"]
           },
-          "then": { "required": ["patches"], "properties": { "patches": { "minItems": 1 } } }
+          "then": {
+            "anyOf": [
+              { "required": ["patches"], "properties": { "patches": { "minItems": 1 } } },
+              { "required": ["resume"] }
+            ]
+          }
+        },
+        {
+          "$comment": "resume (same message continues) and followUp (new message) are mutually exclusive. A block of a message that has not ended has no rev yet: instead of patches, the result points at that message ('resume') and the client takes the current state from its stream or snapshot.",
+          "not": { "required": ["resume", "followUp"] }
         }
       ]
     }

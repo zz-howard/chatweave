@@ -114,7 +114,7 @@ flowchart LR
 | crate | 提供 | 不提供 |
 |---|---|---|
 | `chatweave-protocol` | `Message`、`Block`（内置类型的强类型 `data` + 自定义类型的 `serde_json::Value`）、`StreamEvent`、`ActionSpec/Request/Result`；`validate()`（JSON Schema + `Limits`）；`fold(events) -> Message`；自定义类型的 Schema 注册表 | 任何 IO |
-| `chatweave-server` | `MessageStream` 生成器：分配 `seq`、块 ID、`index`，合并 delta，开关块，开始 / 结束运行步骤（停止生成时把未结束的步骤自动记为 `cancelled`），生成 `fallbackText` 辅助；`EventLog` / `EventSink` 接口，默认实现是进程内环形缓冲（[D42](decisions.md)，持久日志由宿主可选实现）；`sse_response()`（Axum，处理 `Last-Event-ID`、心跳、快照回退、`ChatWeave-Protocol` 响应头）；停止生成与“会话中正在生成的消息”查询的辅助函数（D39、D41）；`ActionRegistry` + `dispatch()`；`MarkdownAdapter`（把纯文本流包成 markdown 块） | 持久化实现、鉴权、业务处理器、模型调用 |
+| `chatweave-server` | `MessageStream` 生成器：分配 `seq`、块 ID、`index`，合并 delta，开关块，开始 / 结束运行步骤（含子步骤；停止生成时把未结束的步骤自动记为 `cancelled`），暂停与继续（`message.paused` / `message.resumed`、暂停检查点），生成 `fallbackText` 辅助；`EventLog` / `EventSink` 接口，默认实现是进程内环形缓冲（[D42](decisions.md)，持久日志由宿主可选实现）；`sse_response()`（Axum，处理 `Last-Event-ID`、心跳、快照回退、`ChatWeave-Protocol` 响应头）；停止生成与“会话中正在生成的消息”查询的辅助函数（D39、D41）；`ActionRegistry` + `dispatch()`；`MarkdownAdapter`（把纯文本流包成 markdown 块） | 持久化实现、鉴权、业务处理器、模型调用 |
 
 Action Registry 的接口草图（未编译，示意）：
 
@@ -236,6 +236,30 @@ sequenceDiagram
   App->>App: 应用补丁，显示服务端记录的结果（可能是同一用户在另一台设备上、或群聊里别人先给出的答案）；如有 followUp，订阅新消息的流
 ```
 
+### 4.3 运行中途的确认（中断：暂停与继续）
+
+```mermaid
+sequenceDiagram
+  participant U as 用户
+  participant App as 宿主客户端
+  participant API as 宿主服务端（chatweave-server）
+  participant Agent as 宿主 Agent 运行时
+  Agent->>API: 要执行的操作需要用户确认
+  API-->>App: block.start / block.data / block.end（确认卡）
+  API-->>App: message.paused（interrupt：步骤、块）
+  API->>API: 持久化暂停检查点（status = paused、lastSeq）；关闭流
+  Note over App: 已暂停：不重连；过程条“等你确认”
+  U->>App: 点“删除”
+  App->>API: ActionRequest（幂等键），卡片显示“提交中”
+  API->>API: 条件写入：中断仍开着 → 记录答案
+  API->>Agent: 答案作为这次中断的结果，继续这一轮
+  API-->>App: ActionResult（accepted、resume.messageId）
+  App->>API: GET …/messages/{id}/stream（Last-Event-ID = 已应用 seq）
+  API-->>App: block.patch（已确认）、message.resumed、step.finished、block.*……、message.end
+```
+
+宿主怎么在暂停期间保存和恢复自己的 Agent 运行状态（例如工作流引擎、任务表）不属于库的范围；库只要求暂停检查点持久化、继续时沿用同一个 `messageId` 和 `seq` 序列（[protocol.md 4.8](protocol.md#48-中断暂停与继续同一条消息)）。
+
 ## 5. 服务端与客户端的职责划分
 
 | 职责 | 服务端 | 客户端 |
@@ -271,7 +295,8 @@ sequenceDiagram
 - Markdown 与结构化组件混排；语义 IR（10 个内置类型 + 自定义类型）。
 - 客户端注册表的确定性映射；降级链；Markdown-only 模式。
 - 流式：Markdown 增量、组件整块；稳定块 ID、按 ID 补丁、幂等事件、`Last-Event-ID` 续传、快照回退；持久化版本优先；显式停止、临时进度事件、按会话找回正在生成的消息。
-- 运行过程：步骤事件（对齐 AG-UI 1.0 的 `STEP_STARTED` / `STEP_FINISHED`），消息顶部的过程条（生成中展开、结束后自动收起），随消息保存精简的步骤记录（D48–D52）。
+- 运行过程：步骤事件（对齐 AG-UI 1.0 的 `STEP_STARTED` / `STEP_FINISHED`），消息顶部的过程条（生成中展开、结束后自动收起），随消息保存精简的步骤记录（D48–D52）；子 Agent 的嵌套步骤（D58）。
+- 中断：运行中途要用户确认或回答时同一条消息暂停、回答后继续（D53–D57，对齐 AG-UI 1.0 的中断与继续）。
 - 基础 Schema 校验与限制。
 - 最小动作集：`choice.select`、`confirmation.respond`、`form.submit`，服务端注册表 + 参数校验 + 宿主权限 + 破坏性确认。
 - 示例 App 与 golden 测试；一致性夹具；宿主实现一致性套件；只读调试面板。

@@ -200,7 +200,7 @@
           "items": { "type": "string", "maxLength": 64 }
         },
         "freeText": {
-          "description": "Set by the server when a choice was answered with a normal user message instead of an option (free-text answers are never sent through the action channel).",
+          "description": "Set by the server when a choice was answered with text instead of an option: through choice.select {freeText} when the block belongs to an open interrupt, otherwise with a normal user message.",
           "type": "string",
           "maxLength": 500
         },
@@ -219,14 +219,14 @@
           "maxLength": 200
         },
         "reason": {
-          "description": "Why the server ended the block without a user answer. Required for 'cancelled', optional for 'expired' / 'superseded', absent for 'open' / 'resolved'. Lets the UI tell 'you cancelled' apart from 'the system invalidated this'.",
+          "description": "Why the server ended the block without a user answer. Required for 'cancelled', optional for 'expired' / 'superseded', absent for 'open' / 'resolved'. Lets the UI tell 'you cancelled' apart from 'the system invalidated this'. 'stopped': the generation was stopped while paused on this block's interrupt (including a new user message sent instead of answering).",
           "type": "object",
           "required": ["code"],
           "additionalProperties": false,
           "properties": {
             "code": {
               "type": "string",
-              "enum": ["withdrawn", "policy", "record_changed", "record_deleted", "permission_changed", "other"]
+              "enum": ["withdrawn", "policy", "record_changed", "record_deleted", "permission_changed", "stopped", "other"]
             },
             "text": {
               "description": "Short user-facing explanation. No internal details.",
