@@ -1,0 +1,137 @@
+# MVP 实施计划（草案）
+
+> **状态：草案。** 对应 [architecture.md](architecture.md#7-分期) 的 Phase 1。每个任务都能独立实现、独立测试；验收标准写成机器能检查的形式为主。
+
+## 0. 端到端验收场景（MVP 完成的标志）
+
+在示例 App（天气 + 待办助手）中，用脚本化的假 Agent 产生一条消息：**文字 + 天气指标组 + 待办表格 + 简单气温折线图 + 收尾文字**，并验证：
+
+1. 文字逐步出现，组件先占位后整块填满，组件出现时上方已渲染的文字位置不跳动。
+2. 在第 N 个事件时切断网络，恢复后自动续传，最终界面与一次性收完完全一致（golden 相同）。
+3. 事件日志被清空后续传，收到快照，结果仍一致。
+4. 把客户端注册表换成 Markdown-only，消息仍完整可读。
+5. 点一个选项块的选项：点按后只显示“提交中”，服务端校验并更新块状态后才显示结果；另一台模拟设备同步后看到同一个“已回答”；重复提交同一动作只执行一次。两台设备几乎同时选了不同选项：只有一个被记录，后到的一方显示服务端记录的那个答案（含回答者），而不是自己点的。
+6. 删除待办需要破坏性确认块；直接伪造一个指向删除处理器的 `choice.select` 请求被拒绝。
+7. 不提供 `ActionTransport` 时，交互块以只读方式显示，点按不会发出任何消息或请求。
+
+## 1. 任务列表
+
+依赖关系一览：
+
+```
+T0 ─┬─ T1 ─┬─ T2 ─┬─ T3 ─┐
+    │      │      └─ T4 ─┤
+    │      └─ T5 ─┬─ T6 ─┼─ T7 ─┐
+    │             └─ T9 ─┤      ├─ T10
+    │                    └─ T8 ─┘
+    └──────────────────────────────── T11（宿主集成，在宿主仓库）
+```
+
+### T0 仓库骨架与 CI 关卡
+
+- **目标**：建好空仓库结构和全部 CI 关卡，让后续任务一提交就受约束。
+- **主要模块**：仓库根、`rust/`、`dart/`、`tool/`、CI 配置。
+- **依赖**：无。
+- **产物**：Cargo workspace 与 pub workspace 空包；`tool/check_deps`（依赖方向）、`tool/host_terms.txt` + 检查脚本（宿主词汇拦截）、`tool/validate_schemas`（Schema 自检 + 夹具校验）；CI：`cargo fmt/clippy/test`、`dart format/analyze/test`、上述脚本。
+- **验收**：故意在 `chatweave_core` 导入 `package:flutter`、在 `chatweave-protocol` 加 axum 依赖、在库代码里写一个宿主词汇，三种情况 CI 都失败。
+
+### T1 协议规范定稿（0.1）与一致性夹具
+
+- **目标**：把 [protocol.md](protocol.md) 与 `schemas/v0.1/` 定稿为 0.1，产出两端共用的一致性夹具。
+- **主要模块**：`docs/protocol.md`、`schemas/v0.1/`、`fixtures/conformance/`。
+- **依赖**：T0。
+- **产物**：每个内置类型的正例 / 反例；至少 12 个事件流夹具（`*.events.jsonl` + `*.expected.json`），覆盖：纯文本、混排、占位后填充、块失败、中断、重复事件、跳号、快照、补丁与 `rev`、未知块类型、未知事件类型、超限；另有动作夹具：正常回答、先答者胜（后到者拿到 `already_resolved` + 当前状态）、过期、被取代。
+- **验收**：`tool/validate_schemas` 通过（正例全部通过 Schema、反例全部被拒）；夹具的期望消息全部通过 `message.schema.json`。
+
+### T2 Rust：`chatweave-protocol`
+
+- **目标**：协议类型、校验、限制检查、折叠函数。
+- **主要模块**：`rust/crates/chatweave-protocol`。
+- **依赖**：T1。
+- **产物**：serde 类型；`validate()`（`jsonschema` crate + `Limits`：字节数、深度、节点数）；自定义类型 Schema 注册表；`fold(events) -> Result<Message>`。
+- **验收**：所有夹具 JSON 往返无损；`fold` 对每个事件流夹具的结果等于期望消息；反例全部被 `validate()` 拒绝；`cargo tree` 不含 axum / tokio。
+
+### T3 Rust：流生成器、事件日志与 SSE
+
+- **目标**：服务端产生合规事件流、可续传。
+- **主要模块**：`chatweave-server`（`MessageStream`、`EventLog`、`sse_response`，feature `axum`）。
+- **依赖**：T2。
+- **产物**：生成器（分配 seq / 块 ID / index，合并 delta，块失败与中断处理，`fallbackText` 辅助）；`EventLog` 接口 + 内存实现；Axum SSE 辅助（`Last-Event-ID` / `?after=`、心跳、快照回退、`resume_unavailable`）；崩溃恢复辅助（折叠日志 → interrupted）。
+- **验收**：生成器的输出逐条通过 Schema；`axum-test` 集成测试：中途断开后带 `Last-Event-ID` 重连，拼接结果与不断开一致；日志清空后得到快照；慢订阅者被断开不影响生成。
+
+### T4 Rust：Action Registry 与 dispatcher
+
+- **目标**：受控动作的服务端处理。
+- **主要模块**：`chatweave-server::action`。
+- **依赖**：T2。
+- **产物**：`ActionHandler<Ctx>`、`ActionStore<Ctx>`、`ActionRegistry::dispatch()`；内存版 `ActionStore`。
+- **验收**：单元测试覆盖 protocol.md 5.2 的每一步各自的拒绝路径（未声明、target 不符、已回答、过期、被取代、选项不在列表、表单越界、破坏性非确认、重复 ID 回放、`authorize` 拒绝）；非 `open` 的拒绝都带当前状态的补丁；并发的两个不同答案只有一个成功；成功路径返回补丁且 `rev` +1。
+
+### T5 Dart：`chatweave_core`
+
+- **目标**：客户端协议核心，纯 Dart。
+- **主要模块**：`dart/packages/chatweave_core`。
+- **依赖**：T1。
+- **产物**：模型类（手写序列化）；`SseDecoder`；`EventParser`；`BlockStore`（单一写入口 `apply`、结构共享、seq 去重、按块合并、Merge Patch、`rev` 规则、持久化版本对账、`clientMessageId` 对账）；`StreamController`（续传状态机、触发时机、单飞、轮数上限、退避、心跳超时）；`InteractionController`；`ViewportController`（纯函数）；`inspect()` 只读快照与事件环形缓冲；`ChatWeaveStore` / `StreamTransport` / `ActionTransport` 接口与内存实现、`ScriptedTransport`；宿主实现一致性套件；`Limits`。
+- **验收**：同一批一致性夹具全部通过（与 Rust 的 `fold` 结果一致）；SSE 解码对任意切分的字节流（逐字节、跨帧切分）结果相同；续传状态机的属性测试（随机插入重复、断线）最终状态等于期望消息；重复事件不触发通知且返回同一对象；同一消息的多个续传触发只产生一次连接；`ViewportController` 的单元测试（插入历史、组件变高时锚点不动）；内存实现通过一致性套件，故意写坏的实现被套件发现；`pubspec.yaml` 不含 Flutter，源码不导入 `dart:io`。
+
+### T6 Flutter：主题接口、Markdown、注册表与降级
+
+- **目标**：渲染底座。
+- **主要模块**：`chatweave_flutter`（`ChatWeaveTheme`、`MarkdownBlockView`、`BlockRegistry`、`FallbackNote`）。
+- **依赖**：T5。
+- **产物**：主题接口与中性浅色 / 深色主题；Markdown 安全子集（含流式“稳定段落 + 活动尾部”）；注册表（含 `override`、`markdownOnly()`、`capabilities()`）；降级链。
+- **验收**：Markdown 子集测试（HTML、图片、`javascript:` 链接均按纯文本 / 禁用处理；单换行即换行）；未知类型、过高版本、`parse` 抛异常、`build` 抛异常、布局阶段抛异常五种情况都只降级该块，且 `onBlockRenderError` 每块只上报一次；对内置类型调用 `register` 抛错；长文本流式时每批 delta 只重新解析尾部（用计数器断言）。
+
+### T7 Flutter：默认组件
+
+- **目标**：10 种内置类型的中性默认组件。
+- **主要模块**：`chatweave_flutter/components`。
+- **依赖**：T6。
+- **产物**：`MetricTile`、`MetricGrid`、`DataTableView`、`LineChartView`（自绘）、`ComparisonTable`、`StatusView`、`ChoiceView`、`ConfirmationCard`、`IntentForm`，以及各自的占位骨架。
+- **验收**：每个组件的组件测试 + golden（浅 / 深 × 360 / 430 × 100% / 200%）；无障碍指南测试通过；200% 字号无溢出（`tester.takeException()` 为空）。
+
+### T8 Flutter：聊天列表、输入框与流式集成
+
+- **目标**：把流接到界面上，且界面不跳。
+- **主要模块**：`ChatWeaveList`、`ChatWeaveComposer`、`MessageView`。
+- **依赖**：T6、T7。
+- **产物**：反向列表（`CustomScrollView` + `SliverList`），由 `ViewportController` 驱动（唯一的滚动写入点）；滚动跟随与“有新内容”按钮、占位尺寸过渡、每帧最多一次重建、生成中的消息不显示操作栏、可替换的用户消息 / 消息外框构建器；`ChatWeaveDebugOverlay`（只读）。
+- **验收**：用夹具驱动的组件测试：组件出现前后，上方已渲染文字的位置（`tester.getTopLeft`）不变；用户上翻时不自动滚动，生成中的消息变长不增加“新内容”计数；读屏只在块结束时播报；打开调试面板前后 store 的事件序列完全相同（只读）；导出的 JSON 默认不含正文。
+
+### T9 Dart / Flutter：动作客户端
+
+- **目标**：交互块的客户端流程。
+- **主要模块**：`chatweave_core`（`ActionRequest` 构造、`InteractionController`）、`chatweave_flutter`（交互组件接线）。
+- **依赖**：T5、T7。
+- **产物**：“提交中”与“已排队（离线）”显示状态（不乐观显示结果）、收到补丁后显示服务端结果（含别人先答的情况）、`followUp` 自动订阅、错误显示（含 `fieldErrors`）、`unavailable` / 超时的“正在确认”状态与同 ID 重试、无 `ActionTransport` 时只读。
+- **验收**：重复点击只生成一个动作 ID；网络错误后重试复用同一 ID；提交中界面上没有任何选项被标为已选；服务端拒绝时回到可操作状态并显示原因；`already_resolved` 时显示补丁里的答案而不是本地点击；补丁重复应用无副作用；组件被回收重建后提交中状态与幂等键不变。
+
+### T10 示例 App 与端到端测试
+
+- **目标**：证明库在非宿主领域完整可用，并作为 golden 的运行环境。
+- **主要模块**：`examples/assist_demo/server`（Axum + 脚本化假 Agent + 内存存储）、`examples/assist_demo/app`（Flutter）。
+- **依赖**：T3、T4、T8、T9。
+- **产物**：天气 + 待办领域；自定义类型 `x-todo.task_card` 演示宿主组件注册；断网模拟开关。
+- **验收**：第 0 节的七条端到端场景全部自动化通过（集成测试 + golden）。
+
+### T11 首个宿主集成（在宿主仓库进行，不在本仓库）
+
+- **目标**：在真实宿主里用路径依赖接入，验证接口够用、没有泄漏宿主概念。
+- **依赖**：T5–T9 可用即可开始（服务端部分依赖 T3、T4）。
+- **产物（宿主侧）**：主题实现、存储适配器、自定义组件、服务端映射与 SSE 端点、动作处理器。
+- **验收**：宿主集成过程中需要改库的地方，全部以“通用能力”的形式进入库（不出现宿主词汇，CI 词汇拦截通过）；宿主的存储与传输实现通过库的一致性套件；宿主测试通过。
+
+## 2. 风险较高的部分与替代方案
+
+| # | 风险 | 首选方案 | 替代方案 |
+|---|---|---|---|
+| R1 | 长 Markdown 流式渲染卡顿（每批 delta 重解析） | “稳定段落 + 活动尾部”增量解析 + 帧级批量 | 服务端按句 / 段切块（每段一个 markdown 块）；或流式期间先显示纯文本，块结束后再渲染 Markdown |
+| R2 | 移动网络、运营商代理切断或缓冲 SSE 长连接 | 心跳 + `no-store` + 关闭代理缓冲 + 续传 | 降级为短轮询（`GET …/events?after=N` 一次取一批）；最差情况只靠宿主同步拿最终版本（失去逐字效果但功能完整） |
+| R3 | 反向列表在内容增长时滚动锚定不稳 | 自研 `CustomScrollView` + 纯函数 `ViewportController`（锚点 = ID + 偏移，可在纯 Dart 里单测）+ 尺寸过渡 + 底部跟随逻辑 | 引入 `flutter_chat_ui`（后端无关、可完全自定义构建器）只用它的列表与动画 |
+| R4 | 自绘图表工作量与质量 | `CustomPainter` 只做折线（v1 足够） | `fl_chart` 等成熟图表库；或 v1 直接把 `time_series` 降级为表格 |
+| R5 | Dart 端缺少成熟的 JSON Schema 2020-12 校验器 | 客户端不跑 Schema，只做类型化解析 + 限制检查；Schema 一致性由夹具保证 | 评估 `json_schema` 包，仅在测试中使用 |
+| R6 | Rust 与 Dart 两套实现漂移 | 共用一致性夹具，两端 CI 都跑 | 从 Schema 生成两端类型（`typify` / 自写生成器），代价是生成代码可读性差 |
+| R7 | 模型的工具调用参数分片到达 | 服务端缓冲到工具调用完整再执行并发 `block.data`（与“组件整块到达”一致） | — |
+| R8 | 事件日志写入量（每个 delta 一行） | 合并 delta（约 20 字 / 50ms 一批）；日志保留期短 | 只在内存保留日志 + 进程重启后只能快照（需客户端支持 `stream.snapshot`） |
+| R9 | A2UI 将来成为事实标准，迁移成本 | 字段形状对齐 + 映射表 | Phase 2 评估适配器；或在块内嵌 A2UI surface 作为一种自定义类型 |

@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zz-howard/chatweave/schemas/v0.1/action.schema.json",
+  "title": "ChatWeave Action (draft 0.1)",
+  "description": "DRAFT. Action protocol v1: the action spec declared inside an interactive block (server-authored), the action request sent by the client, and the action result returned by the server. Producers validate strictly; consumers parse leniently and ignore unknown fields.",
+  "$defs": {
+    "messageId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "blockId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+    },
+    "optionId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+    },
+    "actionId": {
+      "description": "Client-generated unique id; doubles as the idempotency key. UUIDv7 recommended.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{7,127}$"
+    },
+    "actionType": {
+      "description": "v1 controlled action types. Phase 3 will add more (e.g. item.open, filter.apply).",
+      "type": "string",
+      "enum": ["choice.select", "confirmation.respond", "form.submit"]
+    },
+    "target": {
+      "description": "Name of the host-registered handler in the server-side Action Registry, e.g. 'clarification.answer'. Opaque to the library.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){0,3}$",
+      "maxLength": 64
+    },
+    "actionSpec": {
+      "description": "Declared by the server inside a choice / confirmation / form_intent block. The client never invents an action spec; it can only reference the one persisted in the block.",
+      "type": "object",
+      "required": ["type", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "$ref": "#/$defs/actionType" },
+        "target": { "$ref": "#/$defs/target" },
+        "requiresConfirmation": {
+          "description": "True for destructive or irreversible operations. Such actions may only be declared on a confirmation block with severity 'destructive'. The server registry enforces this independently.",
+          "type": "boolean",
+          "default": false
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "if": {
+        "properties": { "requiresConfirmation": { "const": true } },
+        "required": ["requiresConfirmation"]
+      },
+      "then": {
+        "properties": { "type": { "const": "confirmation.respond" } }
+      }
+    },
+    "actionContext": {
+      "description": "Ids that locate the block the action belongs to. Everything else (user, tenant, permissions) is derived server-side by the host and never trusted from the client.",
+      "type": "object",
+      "required": ["messageId", "blockId"],
+      "additionalProperties": false,
+      "properties": {
+        "conversationId": { "$ref": "#/$defs/messageId" },
+        "messageId": { "$ref": "#/$defs/messageId" },
+        "blockId": { "$ref": "#/$defs/blockId" }
+      }
+    },
+    "choiceSelectPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "selected": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/optionId" },
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true
+        }
+      },
+      "required": ["selected"],
+      "$comment": "Free-text answers to a choice are sent as normal user messages, not through this payload; the host links them to the open block and resolves it server-side."
+    },
+    "confirmationRespondPayload": {
+      "type": "object",
+      "required": ["outcome"],
+      "additionalProperties": false,
+      "properties": {
+        "outcome": { "type": "string", "enum": ["confirm", "cancel"] }
+      }
+    },
+    "formSubmitPayload": {
+      "type": "object",
+      "required": ["values"],
+      "additionalProperties": false,
+      "properties": {
+        "values": {
+          "type": "object",
+          "maxProperties": 12,
+          "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,31}$" },
+          "additionalProperties": {
+            "anyOf": [
+              { "type": ["string", "number", "boolean", "null"], "maxLength": 2000 },
+              { "type": "array", "maxItems": 20, "items": { "type": "string", "maxLength": 64 } }
+            ]
+          }
+        }
+      }
+    },
+    "actionRequest": {
+      "type": "object",
+      "required": ["id", "protocolVersion", "type", "target", "context", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Idempotency key. Generated once per user intent on a block; retries after a network error or timeout MUST reuse it (the action may already have run). A new id is only minted when the user makes a new decision after a definitive rejection while the block is still open.",
+          "$ref": "#/$defs/actionId"
+        },
+        "protocolVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+        "type": { "$ref": "#/$defs/actionType" },
+        "target": {
+          "description": "Echo of the spec's target. The server uses the persisted spec; a mismatch is rejected.",
+          "$ref": "#/$defs/target"
+        },
+        "context": { "$ref": "#/$defs/actionContext" },
+        "payload": { "type": "object" },
+        "clientTs": { "type": "string", "format": "date-time" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "choice.select" } } },
+          "then": { "properties": { "payload": { "$ref": "#/$defs/choiceSelectPayload" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "confirmation.respond" } } },
+          "then": { "properties": { "payload": { "$ref": "#/$defs/confirmationRespondPayload" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "form.submit" } } },
+          "then": { "properties": { "payload": { "$ref": "#/$defs/formSubmitPayload" } } }
+        }
+      ]
+    },
+    "actionError": {
+      "type": "object",
+      "required": ["code", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "invalid_payload",
+            "not_found",
+            "forbidden",
+            "already_resolved",
+            "expired",
+            "confirmation_required",
+            "target_mismatch",
+            "superseded",
+            "conflict",
+            "rate_limited",
+            "unavailable",
+            "unsupported",
+            "internal"
+          ],
+          "description": "forbidden: this person may not answer this block. conflict: a business rule refused the operation. already_resolved / expired / superseded: the block is no longer open; the result carries patches with the server's actual state. unavailable: the outcome is unknown (the action may have run); clients must not present it as a failure and should refresh the block state, retrying with the same action id."
+        },
+        "message": {
+          "description": "Human-readable, safe to show to the end user. Never contains internal details.",
+          "type": "string",
+          "maxLength": 500
+        },
+        "retryable": { "type": "boolean", "default": false },
+        "fieldErrors": {
+          "description": "For form.submit: per-field validation messages.",
+          "type": "object",
+          "maxProperties": 12,
+          "additionalProperties": { "type": "string", "maxLength": 200 }
+        }
+      }
+    },
+    "blockPatch": {
+      "description": "Same shape as the block.patch stream event payload, plus messageId. Used to carry block state changes in an action result.",
+      "type": "object",
+      "required": ["messageId", "blockId", "rev", "patch"],
+      "additionalProperties": false,
+      "properties": {
+        "messageId": { "$ref": "#/$defs/messageId" },
+        "blockId": { "$ref": "#/$defs/blockId" },
+        "rev": { "type": "integer", "minimum": 2 },
+        "patch": {
+          "description": "JSON Merge Patch (RFC 7396) applied to the block's {data, fallbackText, metadata}.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "data": { "type": "object" },
+            "fallbackText": { "type": "string", "maxLength": 2000 },
+            "metadata": { "type": "object" }
+          }
+        }
+      }
+    },
+    "actionResult": {
+      "type": "object",
+      "required": ["actionId", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "actionId": { "$ref": "#/$defs/actionId" },
+        "status": {
+          "description": "completed: done synchronously. accepted: queued for async work (e.g. a new agent turn). rejected: validation / permission / state failure, do not retry as-is. failed: execution error, see error.retryable.",
+          "type": "string",
+          "enum": ["completed", "accepted", "rejected", "failed"]
+        },
+        "error": { "$ref": "#/$defs/actionError" },
+        "patches": {
+          "type": "array",
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/blockPatch" }
+        },
+        "followUp": {
+          "description": "When the action starts a new assistant message (e.g. the agent resumes after a clarification).",
+          "type": "object",
+          "required": ["messageId"],
+          "additionalProperties": false,
+          "properties": {
+            "messageId": { "$ref": "#/$defs/messageId" },
+            "streamable": { "type": "boolean", "default": true }
+          }
+        },
+        "replayed": {
+          "description": "True when the server returned a stored result for a repeated action id.",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "enum": ["rejected", "failed"] } } },
+          "then": { "required": ["error"] }
+        },
+        {
+          "$comment": "When the block is no longer open, the server returns its actual current state so the client shows the server outcome (e.g. someone else answered first), never the local tap.",
+          "if": {
+            "properties": { "error": { "properties": { "code": { "enum": ["already_resolved", "expired", "superseded"] } }, "required": ["code"] } },
+            "required": ["error"]
+          },
+          "then": { "required": ["patches"], "properties": { "patches": { "minItems": 1 } } }
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/actionRequest" },
+    { "$ref": "#/$defs/actionResult" }
+  ]
+}

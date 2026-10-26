@@ -1,0 +1,614 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zz-howard/chatweave/schemas/v0.1/content-block.schema.json",
+  "title": "ChatWeave Content Block (draft 0.1)",
+  "description": "DRAFT. One semantic content block inside a message. Blocks describe WHAT to express (facts, semantics), never HOW to draw it (colors, sizes, layout). Producers (servers) validate strictly against this schema; consumers (clients) parse leniently, ignore unknown fields and fall back to fallbackText for anything they cannot render.",
+  "type": "object",
+  "required": ["id", "type", "schemaVersion", "data"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "#/$defs/blockId" },
+    "type": { "$ref": "#/$defs/blockType" },
+    "schemaVersion": {
+      "description": "Version of this block type's data schema. Additive optional fields do not bump it; any semantic or breaking change does.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 999
+    },
+    "data": { "type": "object" },
+    "fallbackText": {
+      "description": "Plain-text rendering of this block, used by old clients, screen readers, notifications and search. Required for every non-markdown block.",
+      "type": "string",
+      "maxLength": 2000
+    },
+    "metadata": { "$ref": "#/$defs/blockMetadata" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "not": { "const": "markdown" } } } },
+      "then": { "required": ["fallbackText"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "markdown" } } },
+      "then": { "properties": { "data": { "$ref": "#/$defs/markdownData" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "metric" } } },
+      "then": { "properties": { "data": { "$ref": "#/$defs/metricData" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "metric_group" } } },
+      "then": { "properties": { "data": { "$ref": "#/$defs/metricGroupData" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "dataset" } } },
+      "then": { "properties": { "data": { "$ref": "#/$defs/datasetData" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "time_series" } } },
+      "then": { "properties": { "data": { "$ref": "#/$defs/timeSeriesData" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "comparison" } } },
+      "then": { "properties": { "data": { "$ref": "#/$defs/comparisonData" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "status" } } },
+      "then": { "properties": { "data": { "$ref": "#/$defs/statusData" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "choice" } } },
+      "then": { "properties": { "data": { "$ref": "#/$defs/choiceData" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "confirmation" } } },
+      "then": { "properties": { "data": { "$ref": "#/$defs/confirmationData" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "form_intent" } } },
+      "then": { "properties": { "data": { "$ref": "#/$defs/formIntentData" } } }
+    },
+    {
+      "if": { "properties": { "type": { "pattern": "^x-" } } },
+      "then": { "properties": { "data": { "$ref": "#/$defs/customData" } } }
+    }
+  ],
+  "$defs": {
+    "blockId": {
+      "description": "Stable within its message. Never reused for a different block. Patches address blocks by this id.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+    },
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,31}$"
+    },
+    "blockType": {
+      "description": "Built-in semantic type, or a host-defined custom type namespaced as x-<host>.<name>, e.g. x-jiabu.record_card.",
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "markdown",
+            "metric",
+            "metric_group",
+            "dataset",
+            "time_series",
+            "comparison",
+            "status",
+            "choice",
+            "confirmation",
+            "form_intent"
+          ]
+        },
+        {
+          "type": "string",
+          "pattern": "^x-[a-z0-9]+(-[a-z0-9]+)*\\.[a-z][a-z0-9_]{0,63}$"
+        }
+      ]
+    },
+    "label": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "shortLabel": { "type": "string", "minLength": 1, "maxLength": 24 },
+    "text": { "type": "string", "maxLength": 2000 },
+    "unit": { "type": "string", "minLength": 1, "maxLength": 32 },
+    "scalar": {
+      "type": ["number", "string", "boolean", "null"],
+      "maxLength": 500
+    },
+    "temporal": {
+      "description": "ISO 8601 date (YYYY-MM-DD) or date-time.",
+      "type": "string",
+      "anyOf": [{ "format": "date" }, { "format": "date-time" }]
+    },
+    "assessment": {
+      "description": "A semantic judgement. Renderers map status to design-system colors and icons; the producer never chooses colors.",
+      "type": "object",
+      "required": ["status"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["positive", "negative", "warning", "critical", "neutral", "info"]
+        },
+        "label": { "$ref": "#/$defs/label" },
+        "detail": { "$ref": "#/$defs/text" }
+      }
+    },
+    "valueFormat": {
+      "description": "Semantic formatting hint. The renderer applies locale-aware formatting; producers send raw numbers.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "style": {
+          "type": "string",
+          "enum": ["decimal", "integer", "percent", "currency", "duration"]
+        },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "minorUnits": {
+          "description": "If true, numeric values are integers in the currency's minor unit (e.g. cents) and must be divided by 10^digits for display.",
+          "type": "boolean",
+          "default": false
+        },
+        "maximumFractionDigits": { "type": "integer", "minimum": 0, "maximum": 6 }
+      }
+    },
+    "blockMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provenance": {
+          "description": "Where the facts in this block came from. 'adapter' blocks may only be markdown (adapters never infer facts).",
+          "type": "string",
+          "enum": ["model", "tool", "host", "adapter"]
+        },
+        "asOf": { "type": "string", "format": "date-time" },
+        "citations": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "required": ["label"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "$ref": "#/$defs/label" },
+              "url": { "type": "string", "format": "uri", "maxLength": 2000 },
+              "ref": { "type": "string", "maxLength": 128 }
+            }
+          }
+        },
+        "host": {
+          "description": "Opaque host extension data. Never rendered by the library.",
+          "type": "object",
+          "maxProperties": 16
+        }
+      }
+    },
+    "blockState": {
+      "description": "Server-authored state of an interactive block, updated via block.patch only after the server has recorded the outcome. Clients never write it optimistically: the transient 'submitting' / 'queued' display states are client-local and never appear in the protocol. When several people can answer the same block, the first recorded answer wins and every client shows that server outcome.",
+      "type": "object",
+      "required": ["status"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "description": "open: accepts actions. resolved: an answer was recorded (see selected / outcome / values / freeText, resolvedBy, resolvedAt). expired: expiresAt passed without an answer. cancelled: withdrawn by the server. superseded: replaced by a newer interactive block (e.g. a fresh confirmation for the same operation).",
+          "type": "string",
+          "enum": ["open", "resolved", "expired", "cancelled", "superseded"]
+        },
+        "selected": {
+          "type": "array",
+          "maxItems": 10,
+          "items": { "type": "string", "maxLength": 64 }
+        },
+        "freeText": {
+          "description": "Set by the server when a choice was answered with a normal user message instead of an option (free-text answers are never sent through the action channel).",
+          "type": "string",
+          "maxLength": 500
+        },
+        "outcome": { "type": "string", "enum": ["confirm", "cancel"] },
+        "values": { "type": "object", "maxProperties": 12 },
+        "resolvedBy": {
+          "description": "Opaque host identifier of whoever's answer was recorded (e.g. a member id). The library never interprets it; the host resolves it to a display name.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "resolvedAt": { "type": "string", "format": "date-time" },
+        "supersededBy": {
+          "description": "For status 'superseded': id of the replacing block, as 'messageId/blockId' or just 'blockId' within the same message.",
+          "type": "string",
+          "maxLength": 200
+        },
+        "note": { "$ref": "#/$defs/text" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "resolved" } }, "required": ["status"] },
+          "then": { "required": ["resolvedAt"] }
+        }
+      ]
+    },
+
+    "markdownData": {
+      "type": "object",
+      "required": ["text"],
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "description": "Markdown restricted to the safe subset in docs/rendering.md. During streaming it grows via append-only block.delta events.",
+          "type": "string",
+          "maxLength": 32768
+        }
+      }
+    },
+    "metricData": {
+      "type": "object",
+      "required": ["label", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "label": { "$ref": "#/$defs/label" },
+        "value": { "type": ["number", "string", "null"], "maxLength": 64 },
+        "unit": { "$ref": "#/$defs/unit" },
+        "format": { "$ref": "#/$defs/valueFormat" },
+        "delta": {
+          "type": "object",
+          "required": ["value"],
+          "additionalProperties": false,
+          "properties": {
+            "value": { "type": "number" },
+            "unit": { "$ref": "#/$defs/unit" },
+            "direction": { "type": "string", "enum": ["up", "down", "flat"] },
+            "period": { "$ref": "#/$defs/label" },
+            "assessment": { "$ref": "#/$defs/assessment" }
+          }
+        },
+        "assessment": { "$ref": "#/$defs/assessment" },
+        "asOf": { "$ref": "#/$defs/temporal" },
+        "description": { "$ref": "#/$defs/text" }
+      }
+    },
+    "metricGroupData": {
+      "type": "object",
+      "required": ["metrics"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "$ref": "#/$defs/label" },
+        "metrics": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": { "$ref": "#/$defs/metricData" }
+        },
+        "summary": { "$ref": "#/$defs/text" }
+      }
+    },
+    "column": {
+      "type": "object",
+      "required": ["key", "label", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "$ref": "#/$defs/key" },
+        "label": { "$ref": "#/$defs/label" },
+        "type": {
+          "type": "string",
+          "enum": ["string", "number", "integer", "boolean", "date", "datetime", "percent", "currency"]
+        },
+        "unit": { "$ref": "#/$defs/unit" },
+        "format": { "$ref": "#/$defs/valueFormat" }
+      }
+    },
+    "datasetData": {
+      "type": "object",
+      "required": ["columns", "rows"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "$ref": "#/$defs/label" },
+        "caption": { "$ref": "#/$defs/text" },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": { "$ref": "#/$defs/column" }
+        },
+        "rows": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "object",
+            "maxProperties": 12,
+            "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,31}$" },
+            "additionalProperties": { "$ref": "#/$defs/scalar" }
+          }
+        },
+        "totalRows": {
+          "description": "Set when rows were truncated by the producer; the renderer shows 'showing N of M'.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "sort": {
+          "type": "object",
+          "required": ["key"],
+          "additionalProperties": false,
+          "properties": {
+            "key": { "$ref": "#/$defs/key" },
+            "direction": { "type": "string", "enum": ["asc", "desc"] }
+          }
+        }
+      }
+    },
+    "timeSeriesData": {
+      "type": "object",
+      "required": ["xType", "series"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "$ref": "#/$defs/label" },
+        "xType": { "type": "string", "enum": ["date", "datetime", "number", "category"] },
+        "xLabel": { "$ref": "#/$defs/label" },
+        "yLabel": { "$ref": "#/$defs/label" },
+        "yUnit": { "$ref": "#/$defs/unit" },
+        "format": { "$ref": "#/$defs/valueFormat" },
+        "series": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "required": ["key", "label", "points"],
+            "additionalProperties": false,
+            "properties": {
+              "key": { "$ref": "#/$defs/key" },
+              "label": { "$ref": "#/$defs/label" },
+              "unit": { "$ref": "#/$defs/unit" },
+              "points": {
+                "type": "array",
+                "maxItems": 500,
+                "items": {
+                  "type": "object",
+                  "required": ["x", "y"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": { "type": ["string", "number"], "maxLength": 64 },
+                    "y": { "type": ["number", "null"] }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": { "$ref": "#/$defs/text" }
+      }
+    },
+    "comparisonData": {
+      "type": "object",
+      "required": ["subjects", "attributes", "values"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "$ref": "#/$defs/label" },
+        "subjects": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "required": ["id", "label"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "$ref": "#/$defs/key" },
+              "label": { "$ref": "#/$defs/label" }
+            }
+          }
+        },
+        "attributes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "required": ["key", "label"],
+            "additionalProperties": false,
+            "properties": {
+              "key": { "$ref": "#/$defs/key" },
+              "label": { "$ref": "#/$defs/label" },
+              "type": { "type": "string", "enum": ["string", "number", "integer", "boolean", "date", "percent", "currency"] },
+              "unit": { "$ref": "#/$defs/unit" },
+              "preference": { "type": "string", "enum": ["higher_is_better", "lower_is_better", "none"] }
+            }
+          }
+        },
+        "values": {
+          "type": "array",
+          "maxItems": 72,
+          "items": {
+            "type": "object",
+            "required": ["subject", "attribute", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "subject": { "$ref": "#/$defs/key" },
+              "attribute": { "$ref": "#/$defs/key" },
+              "value": { "$ref": "#/$defs/scalar" },
+              "assessment": { "$ref": "#/$defs/assessment" }
+            }
+          }
+        },
+        "conclusion": { "$ref": "#/$defs/text" }
+      }
+    },
+    "statusData": {
+      "type": "object",
+      "required": ["label", "state"],
+      "additionalProperties": false,
+      "properties": {
+        "label": { "$ref": "#/$defs/label" },
+        "state": {
+          "type": "string",
+          "enum": ["pending", "running", "waiting", "succeeded", "failed", "cancelled"]
+        },
+        "detail": { "$ref": "#/$defs/text" },
+        "progress": {
+          "type": "object",
+          "required": ["current"],
+          "additionalProperties": false,
+          "properties": {
+            "current": { "type": "number", "minimum": 0 },
+            "total": { "type": "number", "exclusiveMinimum": 0 },
+            "unit": { "$ref": "#/$defs/unit" }
+          }
+        },
+        "steps": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "required": ["label", "state"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "$ref": "#/$defs/label" },
+              "state": { "type": "string", "enum": ["pending", "running", "waiting", "succeeded", "failed", "cancelled", "skipped"] }
+            }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "option": {
+      "type": "object",
+      "required": ["id", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$" },
+        "label": { "$ref": "#/$defs/label" },
+        "description": { "$ref": "#/$defs/text" }
+      }
+    },
+    "choiceData": {
+      "type": "object",
+      "required": ["prompt", "options", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "prompt": { "$ref": "#/$defs/text" },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 10,
+          "items": { "$ref": "#/$defs/option" }
+        },
+        "selection": { "type": "string", "enum": ["single", "multiple"], "default": "single" },
+        "minSelect": { "type": "integer", "minimum": 0, "maximum": 10 },
+        "maxSelect": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "allowFreeText": { "type": "boolean", "default": false },
+        "action": {
+          "allOf": [
+            { "$ref": "action.schema.json#/$defs/actionSpec" },
+            { "properties": { "type": { "const": "choice.select" } } }
+          ]
+        },
+        "state": { "$ref": "#/$defs/blockState" }
+      }
+    },
+    "confirmationData": {
+      "type": "object",
+      "required": ["title", "severity", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "$ref": "#/$defs/label" },
+        "body": { "$ref": "#/$defs/text" },
+        "severity": { "type": "string", "enum": ["normal", "destructive"] },
+        "details": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "required": ["label", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "$ref": "#/$defs/label" },
+              "value": { "$ref": "#/$defs/scalar" },
+              "unit": { "$ref": "#/$defs/unit" },
+              "format": { "$ref": "#/$defs/valueFormat" }
+            }
+          }
+        },
+        "confirmLabel": { "$ref": "#/$defs/shortLabel" },
+        "cancelLabel": { "$ref": "#/$defs/shortLabel" },
+        "action": {
+          "allOf": [
+            { "$ref": "action.schema.json#/$defs/actionSpec" },
+            { "properties": { "type": { "const": "confirmation.respond" } } }
+          ]
+        },
+        "state": { "$ref": "#/$defs/blockState" }
+      },
+      "if": {
+        "properties": { "action": { "properties": { "requiresConfirmation": { "const": true } }, "required": ["requiresConfirmation"] } }
+      },
+      "then": {
+        "properties": { "severity": { "const": "destructive" } }
+      }
+    },
+    "formField": {
+      "type": "object",
+      "required": ["key", "label", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "$ref": "#/$defs/key" },
+        "label": { "$ref": "#/$defs/label" },
+        "type": {
+          "type": "string",
+          "enum": ["text", "multiline_text", "number", "integer", "date", "datetime", "boolean", "single_select", "multi_select"]
+        },
+        "required": { "type": "boolean", "default": false },
+        "options": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/option" }
+        },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "maxLength": { "type": "integer", "minimum": 1, "maximum": 2000 },
+        "unit": { "$ref": "#/$defs/unit" },
+        "placeholder": { "$ref": "#/$defs/label" },
+        "help": { "$ref": "#/$defs/text" },
+        "defaultValue": {
+          "anyOf": [
+            { "$ref": "#/$defs/scalar" },
+            { "type": "array", "maxItems": 20, "items": { "type": "string", "maxLength": 64 } }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "enum": ["single_select", "multi_select"] } } },
+          "then": { "required": ["options"], "properties": { "options": { "minItems": 1 } } }
+        }
+      ]
+    },
+    "formIntentData": {
+      "description": "Describes WHAT input is needed and why; the renderer decides the form layout.",
+      "type": "object",
+      "required": ["fields", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "$ref": "#/$defs/label" },
+        "purpose": { "$ref": "#/$defs/text" },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": { "$ref": "#/$defs/formField" }
+        },
+        "submitLabel": { "$ref": "#/$defs/shortLabel" },
+        "action": {
+          "allOf": [
+            { "$ref": "action.schema.json#/$defs/actionSpec" },
+            { "properties": { "type": { "const": "form.submit" } } }
+          ]
+        },
+        "state": { "$ref": "#/$defs/blockState" }
+      }
+    },
+    "customData": {
+      "description": "Host-defined data. The host MUST register a JSON Schema for each custom type on the server and validate against it; this generic shape only enforces size limits.",
+      "type": "object",
+      "maxProperties": 32
+    }
+  }
+}

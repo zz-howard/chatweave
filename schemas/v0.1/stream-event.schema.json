@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zz-howard/chatweave/schemas/v0.1/stream-event.schema.json",
+  "title": "ChatWeave Stream Event (draft 0.1)",
+  "description": "DRAFT. One event of a per-message block stream. Transport-neutral; the SSE binding puts seq in the SSE 'id' field and the JSON below in 'data'. (messageId, seq) is unique: consumers drop events with seq <= last applied seq and reconnect on gaps. Consumers ignore unknown event types (but still advance seq).",
+  "type": "object",
+  "required": ["protocolVersion", "type", "messageId", "seq"],
+  "properties": {
+    "protocolVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+    "type": {
+      "type": "string",
+      "enum": [
+        "message.start",
+        "block.start",
+        "block.delta",
+        "block.data",
+        "block.patch",
+        "block.end",
+        "message.end",
+        "message.snapshot",
+        "error"
+      ]
+    },
+    "messageId": { "$ref": "action.schema.json#/$defs/messageId" },
+    "seq": {
+      "description": "Starts at 1 for each message, increments by exactly 1 per event.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "ts": { "type": "string", "format": "date-time" }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/messageStart" },
+    { "$ref": "#/$defs/blockStart" },
+    { "$ref": "#/$defs/blockDelta" },
+    { "$ref": "#/$defs/blockData" },
+    { "$ref": "#/$defs/blockPatch" },
+    { "$ref": "#/$defs/blockEnd" },
+    { "$ref": "#/$defs/messageEnd" },
+    { "$ref": "#/$defs/messageSnapshot" },
+    { "$ref": "#/$defs/streamError" }
+  ],
+  "$defs": {
+    "envelope": {
+      "properties": {
+        "protocolVersion": true,
+        "type": true,
+        "messageId": true,
+        "seq": true,
+        "ts": true
+      }
+    },
+    "blockId": { "$ref": "content-block.schema.json#/$defs/blockId" },
+    "error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "invalid_request",
+            "unauthorized",
+            "not_found",
+            "resume_unavailable",
+            "limit_exceeded",
+            "validation_failed",
+            "upstream_failed",
+            "cancelled",
+            "internal"
+          ]
+        },
+        "message": { "type": "string", "maxLength": 500 },
+        "retryable": { "type": "boolean", "default": false }
+      }
+    },
+
+    "messageStart": {
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "required": ["message"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "const": "message.start" },
+        "message": {
+          "type": "object",
+          "required": ["id", "role", "createdAt"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "$ref": "action.schema.json#/$defs/messageId" },
+            "conversationId": { "$ref": "action.schema.json#/$defs/messageId" },
+            "role": { "type": "string", "enum": ["assistant", "system"] },
+            "createdAt": { "type": "string", "format": "date-time" },
+            "metadata": { "type": "object", "maxProperties": 16 }
+          }
+        }
+      }
+    },
+    "blockStart": {
+      "description": "Creates the block container (placeholder) at a fixed position. Its type never changes afterwards, which keeps layout stable.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "required": ["blockId", "index", "blockType", "schemaVersion"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "const": "block.start" },
+        "blockId": { "$ref": "#/$defs/blockId" },
+        "index": {
+          "description": "Final position of the block in message.blocks (0-based). Blocks are started in index order.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 63
+        },
+        "blockType": { "$ref": "content-block.schema.json#/$defs/blockType" },
+        "schemaVersion": { "type": "integer", "minimum": 1, "maximum": 999 },
+        "placeholder": {
+          "description": "Optional layout hint so the renderer can reserve roughly the right space before data arrives.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "size": { "type": "string", "enum": ["small", "medium", "large"] },
+            "items": { "description": "Expected count of metrics / rows / options.", "type": "integer", "minimum": 0, "maximum": 200 },
+            "label": { "$ref": "content-block.schema.json#/$defs/label" }
+          }
+        }
+      }
+    },
+    "blockDelta": {
+      "description": "v1: only for markdown blocks; appends text. Component blocks never receive deltas in v1.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "required": ["blockId", "delta"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "const": "block.delta" },
+        "blockId": { "$ref": "#/$defs/blockId" },
+        "delta": {
+          "type": "object",
+          "required": ["text"],
+          "additionalProperties": false,
+          "properties": {
+            "text": { "type": "string", "minLength": 1, "maxLength": 4096 }
+          }
+        }
+      }
+    },
+    "blockData": {
+      "description": "Delivers the complete data of a component block (whole, already validated server-side). Sent once per block in v1.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "required": ["blockId", "data", "fallbackText"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "const": "block.data" },
+        "blockId": { "$ref": "#/$defs/blockId" },
+        "data": { "type": "object" },
+        "fallbackText": { "type": "string", "maxLength": 2000 },
+        "metadata": { "$ref": "content-block.schema.json#/$defs/blockMetadata" }
+      }
+    },
+    "blockPatch": {
+      "description": "JSON Merge Patch (RFC 7396) on the block's {data, fallbackText, metadata}. Arrays are replaced wholesale. 'rev' is present only for changes after the message was completed.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "required": ["blockId", "patch"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "const": "block.patch" },
+        "blockId": { "$ref": "#/$defs/blockId" },
+        "rev": { "type": "integer", "minimum": 2 },
+        "patch": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "data": { "type": "object" },
+            "fallbackText": { "type": "string", "maxLength": 2000 },
+            "metadata": { "type": "object" }
+          }
+        }
+      }
+    },
+    "blockEnd": {
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "required": ["blockId", "status"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "const": "block.end" },
+        "blockId": { "$ref": "#/$defs/blockId" },
+        "status": { "type": "string", "enum": ["complete", "error"] },
+        "fallbackText": {
+          "description": "Required when status is 'error' for a component block that never received data.",
+          "type": "string",
+          "maxLength": 2000
+        },
+        "error": { "$ref": "#/$defs/error" }
+      }
+    },
+    "messageEnd": {
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "required": ["status", "fallbackText", "blockCount", "rev"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "const": "message.end" },
+        "status": { "type": "string", "enum": ["complete", "interrupted", "error"] },
+        "fallbackText": { "type": "string", "maxLength": 16000 },
+        "blockCount": {
+          "description": "Number of blocks in the final message; lets the consumer verify it has not missed a block.start.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64
+        },
+        "rev": { "type": "integer", "minimum": 1 },
+        "error": { "$ref": "#/$defs/error" }
+      }
+    },
+    "messageSnapshot": {
+      "description": "Full message state. Sent on resume when the requested seq can no longer be replayed, or by servers that do not keep an event log. Replaces the consumer's local state for this message.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "required": ["message"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "const": "message.snapshot" },
+        "message": { "$ref": "message.schema.json" }
+      }
+    },
+    "streamError": {
+      "description": "Stream-level error. If the message itself failed, a message.end with status 'error' follows; transport-level errors (e.g. resume_unavailable, unauthorized) close the stream.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "required": ["error"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "const": "error" },
+        "blockId": { "$ref": "#/$defs/blockId" },
+        "error": { "$ref": "#/$defs/error" }
+      }
+    }
+  }
+}

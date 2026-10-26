@@ -1,0 +1,26 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Rust
+/rust/target/
+**/target/
+
+# Dart / Flutter
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec_overrides.yaml
+coverage/
+*.iml
+
+# Golden test failure artifacts (baselines are committed)
+**/test/**/failures/
+
+# Local env
+.env
+.env.*
