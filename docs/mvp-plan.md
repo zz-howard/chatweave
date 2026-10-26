@@ -4,7 +4,7 @@
 
 ## 0. 端到端验收场景（MVP 完成的标志）
 
-在示例 App（天气 + 待办助手）中，用脚本化的假 Agent 产生一条消息：**文字 + 天气指标组 + 待办表格 + 简单气温折线图 + 收尾文字**，并验证：
+在示例 App（天气 + 待办助手）中，用脚本化的假 Agent 产生一条消息：**运行步骤（查天气、读待办）+ 文字 + 天气指标组 + 待办表格 + 简单气温折线图 + 收尾文字**，并验证：
 
 1. 文字逐步出现，组件先占位后整块填满，组件出现时上方已渲染的文字位置不跳动。
 2. 在第 N 个事件时切断网络，恢复后自动续传，最终界面与一次性收完完全一致（golden 相同）。
@@ -15,6 +15,7 @@
 7. 不提供 `ActionTransport` 时，交互块以只读方式显示，点按不会发出任何消息或请求。
 8. 生成中按“停止”：消息以“已停止”结束，已出现的内容保留；在停止请求之后、`message.end` 之前切断网络，恢复后客户端**不**重新订阅这条消息，而是拿到持久化版本。只切后台或断网（没按停止）时生成继续，恢复后续传。
 9. 提交用户消息后、收到助手消息 ID 之前杀掉 App：重启后通过“重新提交同一个用户消息 ID”或“查询活动消息”接回同一条助手消息，不产生第二次生成；假 Agent 发出的临时进度提示能显示，但不出现在最终消息里。重启服务端后续传得到快照，结果仍一致。
+10. 运行过程条：生成中过程条在正文之上展开、逐行显示步骤（运行中 / 完成 + 耗时）；其中一步失败时只有这一行显示“没有完成”，其他步骤和回答照常；`message.end` 后自动收起成一行摘要，点按可展开，从历史打开时默认收起。删除待办时步骤显示“等你确认”、确认卡在正文里，确认后这一行显示“已确认”。某一步运行中按停止：这一步显示“已停止”，消息以“已停止”结束。某一步运行中断网，恢复后续传，过程条和最终消息与一次性收完一致；服务端重启后拿到的快照里也有步骤。把客户端换成不声明 `stream.steps` 的版本：步骤事件被忽略、`seq` 照常推进，正文完全一致，只显示临时提示。最终消息的 `fallbackText` 与复制内容里没有过程条。
 
 ## 1. 任务列表
 
@@ -42,7 +43,7 @@ T0 ─┬─ T1 ─┬─ T2 ─┬─ T3 ─┐
 - **目标**：把 [protocol.md](protocol.md) 与 `schemas/v0.1/` 定稿为 0.1，产出两端共用的一致性夹具。
 - **主要模块**：`docs/protocol.md`、`schemas/v0.1/`、`fixtures/conformance/`。
 - **依赖**：T0。
-- **产物**：每个内置类型的正例 / 反例；至少 12 个事件流夹具（`*.events.jsonl` + `*.expected.json`），覆盖：纯文本、混排、占位后填充、块失败、中断、用户停止、重复事件、跳号、快照、补丁与 `rev`、未知块类型、未知事件类型、穿插临时进度事件（折叠结果与不含它们时相同）、超限；另有动作夹具：正常回答、先答者胜（后到者拿到 `already_resolved` + 当前状态）、过期、被取代、服务端作废（`cancelled` + `reason`）；生成控制夹具：开始（重复提交返回同一个助手消息 ID）、停止、活动消息查询。
+- **产物**：每个内置类型的正例 / 反例；至少 20 个事件流夹具（`*.events.jsonl` + `*.expected.json`），覆盖：纯文本、混排、占位后填充、块失败、中断、用户停止、重复事件、跳号、快照、补丁与 `rev`、未知块类型、未知事件类型、穿插临时进度事件（折叠结果与不含它们时相同）、超限；运行步骤夹具：并行步骤、步骤失败（其他步骤与回答不受影响）、`awaiting_user`（带 `blockId`，消息 `complete`）、步骤运行中用户停止（`cancelled` 在 `message.end` 之前）、步骤运行中断线续传（从步骤中间的 `seq` 重放）、步骤运行中拿到快照（快照含 `running` 的步骤，之后收到它的 `step.finished`）、崩溃恢复（运行中的步骤记为 `failed`）、步骤事件对旧客户端（按未知事件忽略，正文折叠结果相同）；反例：重复的 `stepId`、对未开始的步骤发 `step.finished`、已结束消息里有 `running` 的步骤、`awaiting_user` 不带 `blockId`、步骤事件不带 `seq`；另有动作夹具：正常回答、先答者胜（后到者拿到 `already_resolved` + 当前状态）、过期、被取代、服务端作废（`cancelled` + `reason`）；生成控制夹具：开始（重复提交返回同一个助手消息 ID）、停止、活动消息查询。
 - **验收**：`tool/validate_schemas` 通过（正例全部通过 Schema、反例全部被拒）；夹具的期望消息全部通过 `message.schema.json`。
 
 ### T2 Rust：`chatweave-protocol`
@@ -51,15 +52,15 @@ T0 ─┬─ T1 ─┬─ T2 ─┬─ T3 ─┐
 - **主要模块**：`rust/crates/chatweave-protocol`。
 - **依赖**：T1。
 - **产物**：serde 类型；`validate()`（`jsonschema` crate + `Limits`：字节数、深度、节点数）；自定义类型 Schema 注册表；`fold(events) -> Result<Message>`。
-- **验收**：所有夹具 JSON 往返无损；`fold` 对每个事件流夹具的结果等于期望消息；反例全部被 `validate()` 拒绝；`cargo tree` 不含 axum / tokio。
+- **验收**：所有夹具 JSON 往返无损；`fold` 对每个事件流夹具的结果等于期望消息（包括 `steps`）；反例全部被 `validate()` 拒绝；`cargo tree` 不含 axum / tokio。
 
 ### T3 Rust：流生成器、事件日志与 SSE
 
 - **目标**：服务端产生合规事件流、可续传。
 - **主要模块**：`chatweave-server`（`MessageStream`、`EventLog`、`sse_response`，feature `axum`）。
 - **依赖**：T2。
-- **产物**：生成器（分配 seq / 块 ID / index，合并 delta，块失败与中断处理，`fallbackText` 辅助）；`EventLog` 接口 + 默认的进程内环形缓冲实现（按消息、按 `seq`，保留期满释放）+ 检查点辅助；Axum SSE 辅助（`Last-Event-ID` / `?after=`、心跳、快照回退、`resume_unavailable`、`ChatWeave-Protocol` 响应头、`message.activity` 帧不带 `id:`）；停止与活动消息查询的处理函数（比对后清理活动登记）；崩溃恢复辅助（折叠日志或从检查点恢复 → interrupted）。
-- **验收**：生成器的输出逐条通过 Schema；`axum-test` 集成测试：中途断开后带 `Last-Event-ID` 重连，拼接结果与不断开一致；日志清空（或模拟进程重启、缓冲为空）后得到快照；慢订阅者被断开不影响生成；客户端断开连接后生成继续，只有停止请求会结束生成；重复停止返回同样结果；临时进度事件不进入日志和折叠结果。
+- **产物**：生成器（分配 seq / 块 ID / index，合并 delta，块失败与中断处理，`fallbackText` 辅助；运行步骤 API：开始步骤返回一个句柄，结束时给出状态、可选 `summary`，耗时由生成器计算；停止时自动把未结束的步骤记为 `cancelled`；结束消息时仍有未结束的步骤视为宿主缺陷，调试构建直接报错）；`EventLog` 接口 + 默认的进程内环形缓冲实现（按消息、按 `seq`，保留期满释放）+ 检查点辅助；Axum SSE 辅助（`Last-Event-ID` / `?after=`、心跳、快照回退、`resume_unavailable`、`ChatWeave-Protocol` 响应头、`message.activity` 帧不带 `id:`）；停止与活动消息查询的处理函数（比对后清理活动登记）；崩溃恢复辅助（折叠日志或从检查点恢复 → interrupted）。
+- **验收**：生成器的输出逐条通过 Schema；`axum-test` 集成测试：中途断开后带 `Last-Event-ID` 重连，拼接结果与不断开一致；日志清空（或模拟进程重启、缓冲为空）后得到快照；慢订阅者被断开不影响生成；客户端断开连接后生成继续，只有停止请求会结束生成；重复停止返回同样结果；临时进度事件不进入日志和折叠结果；步骤事件进入日志、续传时重放、快照含步骤；停止时每个运行中的步骤都在 `message.end` 之前得到 `cancelled`；崩溃恢复后运行中的步骤为 `failed`。
 
 ### T4 Rust：Action Registry 与 dispatcher
 
@@ -74,7 +75,7 @@ T0 ─┬─ T1 ─┬─ T2 ─┬─ T3 ─┐
 - **目标**：客户端协议核心，纯 Dart。
 - **主要模块**：`dart/packages/chatweave_core`。
 - **依赖**：T1。
-- **产物**：模型类（手写序列化）；`SseDecoder`；`EventParser`；`BlockStore`（单一写入口 `apply`、结构共享、seq 去重、按块合并、Merge Patch、`rev` 规则、持久化版本对账、乐观用户消息按 `id` 对账）；`StreamController`（续传状态机、触发时机、单飞、轮数上限、退避、心跳超时、“已请求停止”不自动重连、临时进度提示、活动消息查询）；`InteractionController`；`ViewportController`（纯函数）；`inspect()` 只读快照与事件环形缓冲；`ChatWeaveStore` / `StreamTransport` / `ActionTransport` 接口与内存实现、`ScriptedTransport`；宿主实现一致性套件；`Limits`。
+- **产物**：模型类（手写序列化）；`SseDecoder`；`EventParser`；`BlockStore`（单一写入口 `apply`、结构共享、seq 去重、按块合并、Merge Patch、`rev` 规则、持久化版本对账、乐观用户消息按 `id` 对账）；`StreamController`（续传状态机、触发时机、单飞、轮数上限、退避、心跳超时、“已请求停止”不自动重连、临时进度提示、活动消息查询）；运行步骤的折叠（与块分开保存）与过程条的本地展开状态；`InteractionController`；`ViewportController`（纯函数）；`inspect()` 只读快照与事件环形缓冲；`ChatWeaveStore` / `StreamTransport` / `ActionTransport` 接口与内存实现、`ScriptedTransport`；宿主实现一致性套件；`Limits`。
 - **验收**：同一批一致性夹具全部通过（与 Rust 的 `fold` 结果一致）；SSE 解码对任意切分的字节流（逐字节、跨帧切分）结果相同；续传状态机的属性测试（随机插入重复、断线）最终状态等于期望消息；重复事件不触发通知且返回同一对象；同一消息的多个续传触发只产生一次连接；`ViewportController` 的单元测试（插入历史、组件变高时锚点不动）；内存实现通过一致性套件，故意写坏的实现被套件发现；`pubspec.yaml` 不含 Flutter，源码不导入 `dart:io`。
 
 ### T6 Flutter：主题接口、Markdown、注册表与降级
@@ -90,8 +91,8 @@ T0 ─┬─ T1 ─┬─ T2 ─┬─ T3 ─┐
 - **目标**：10 种内置类型的中性默认组件。
 - **主要模块**：`chatweave_flutter/components`。
 - **依赖**：T6。
-- **产物**：`MetricTile`、`MetricGrid`、`DataTableView`、`LineChartView`（自绘）、`ComparisonTable`、`StatusView`、`ChoiceView`、`ConfirmationCard`、`IntentForm`，以及各自的占位骨架。
-- **验收**：每个组件的组件测试 + golden（浅 / 深 × 360 / 430 × 100% / 200%）；无障碍指南测试通过；200% 字号无溢出（`tester.takeException()` 为空）。
+- **产物**：`MetricTile`、`MetricGrid`、`DataTableView`、`LineChartView`（自绘）、`ComparisonTable`、`StatusView`、`ChoiceView`、`ConfirmationCard`、`IntentForm`，以及各自的占位骨架；消息级的运行过程条 `ProcessStrip`（[rendering.md 4.3](rendering.md#43-运行过程条processstrip)）。
+- **验收**：每个组件的组件测试 + golden（浅 / 深 × 360 / 430 × 100% / 200%）；无障碍指南测试通过；200% 字号无溢出（`tester.takeException()` 为空）；`ProcessStrip` 覆盖运行中 / 全部完成 / 有失败 / 等你确认（块 open 与已确认）/ 已停止 / 收起与展开，读屏语义含展开状态，状态不只靠颜色。
 
 ### T8 Flutter：聊天列表、输入框与流式集成
 
@@ -99,7 +100,7 @@ T0 ─┬─ T1 ─┬─ T2 ─┬─ T3 ─┐
 - **主要模块**：`ChatWeaveList`、`ChatWeaveComposer`、`MessageView`。
 - **依赖**：T6、T7。
 - **产物**：反向列表（`CustomScrollView` + `SliverList`），由 `ViewportController` 驱动（唯一的滚动写入点）；滚动跟随与“有新内容”按钮、占位尺寸过渡、每帧最多一次重建、生成中的消息不显示操作栏、可替换的用户消息 / 消息外框构建器；`ChatWeaveDebugOverlay`（只读）。
-- **验收**：用夹具驱动的组件测试：组件出现前后，上方已渲染文字的位置（`tester.getTopLeft`）不变；用户上翻时不自动滚动，生成中的消息变长不增加“新内容”计数；读屏只在块结束时播报；打开调试面板前后 store 的事件序列完全相同（只读）；导出的 JSON 默认不含正文。
+- **验收**：用夹具驱动的组件测试：组件出现前后，上方已渲染文字的位置（`tester.getTopLeft`）不变；过程条新增步骤、`message.end` 时收起，用户正在看的内容不动；有步骤运行时不显示临时提示；用户手动展开过的过程条在 `message.end` 时不被自动收起；用户上翻时不自动滚动，生成中的消息变长不增加“新内容”计数；读屏只在块结束时播报；打开调试面板前后 store 的事件序列完全相同（只读）；导出的 JSON 默认不含正文。
 
 ### T9 Dart / Flutter：动作客户端
 
@@ -114,8 +115,8 @@ T0 ─┬─ T1 ─┬─ T2 ─┬─ T3 ─┐
 - **目标**：证明库在非宿主领域完整可用，并作为 golden 的运行环境。
 - **主要模块**：`examples/assist_demo/server`（Axum + 脚本化假 Agent + 内存存储）、`examples/assist_demo/app`（Flutter）。
 - **依赖**：T3、T4、T8、T9。
-- **产物**：天气 + 待办领域；自定义类型 `x-todo.task_card` 演示宿主组件注册；断网模拟开关。
-- **验收**：第 0 节的九条端到端场景全部自动化通过（集成测试 + golden）。
+- **产物**：天气 + 待办领域；自定义类型 `x-todo.task_card` 演示宿主组件注册；断网模拟开关；假 Agent 的工具都登记了步骤标签（含一个可配置为失败的天气查询）。
+- **验收**：第 0 节的十条端到端场景全部自动化通过（集成测试 + golden）。
 
 ### T11 首个宿主集成（在宿主仓库进行，不在本仓库）
 

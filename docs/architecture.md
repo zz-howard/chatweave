@@ -23,7 +23,7 @@ ChatWeave 作为独立的库，两种会话形态都支持（[D38](decisions.md)
 | 场景 | 说明 | 只在这个场景里出现的问题 |
 |---|---|---|
 | **一对一** | 一位用户和 AI 对话，没有第三方加入。用户可能有多台设备 | — |
-| **群聊** | 多位成员和 AI 在同一个会话里，同一条消息、同一张交互卡会出现在多个人面前 | 多人同时回答同一张卡（先答者胜，[protocol.md 3.4](protocol.md#34-交互块的状态choice--confirmation--form_intent)）；某个块的数据只有部分成员能看（[open-questions.md](open-questions.md) 第 4 条） |
+| **群聊** | 多位成员和 AI 在同一个会话里，同一条消息、同一张交互卡会出现在多个人面前 | 多人同时回答同一张卡（先答者胜，[protocol.md 3.4](protocol.md#34-交互块的状态choice--confirmation--form_intent)）；某个块的数据只有部分成员能看（[open-questions.md](open-questions.md) 第 4 条）；运行步骤的细节按接收者替换成笼统说法（[protocol.md 4.7](protocol.md#47-运行步骤stepstarted--stepfinished)） |
 
 两种场景用同一套协议和客户端规则，库不需要知道当前是哪种。尤其是“交互块点按后只显示‘提交中’，服务端确认后才显示结果”对两种场景都成立：一对一时服务端同样可能拒绝（权限、引用的记录已变化或删除、校验不通过），同一用户也可能在两台设备上操作同一张卡。
 
@@ -114,7 +114,7 @@ flowchart LR
 | crate | 提供 | 不提供 |
 |---|---|---|
 | `chatweave-protocol` | `Message`、`Block`（内置类型的强类型 `data` + 自定义类型的 `serde_json::Value`）、`StreamEvent`、`ActionSpec/Request/Result`；`validate()`（JSON Schema + `Limits`）；`fold(events) -> Message`；自定义类型的 Schema 注册表 | 任何 IO |
-| `chatweave-server` | `MessageStream` 生成器：分配 `seq`、块 ID、`index`，合并 delta，开关块，生成 `fallbackText` 辅助；`EventLog` / `EventSink` 接口，默认实现是进程内环形缓冲（[D42](decisions.md)，持久日志由宿主可选实现）；`sse_response()`（Axum，处理 `Last-Event-ID`、心跳、快照回退、`ChatWeave-Protocol` 响应头）；停止生成与“会话中正在生成的消息”查询的辅助函数（D39、D41）；`ActionRegistry` + `dispatch()`；`MarkdownAdapter`（把纯文本流包成 markdown 块） | 持久化实现、鉴权、业务处理器、模型调用 |
+| `chatweave-server` | `MessageStream` 生成器：分配 `seq`、块 ID、`index`，合并 delta，开关块，开始 / 结束运行步骤（停止生成时把未结束的步骤自动记为 `cancelled`），生成 `fallbackText` 辅助；`EventLog` / `EventSink` 接口，默认实现是进程内环形缓冲（[D42](decisions.md)，持久日志由宿主可选实现）；`sse_response()`（Axum，处理 `Last-Event-ID`、心跳、快照回退、`ChatWeave-Protocol` 响应头）；停止生成与“会话中正在生成的消息”查询的辅助函数（D39、D41）；`ActionRegistry` + `dispatch()`；`MarkdownAdapter`（把纯文本流包成 markdown 块） | 持久化实现、鉴权、业务处理器、模型调用 |
 
 Action Registry 的接口草图（未编译，示意）：
 
@@ -144,8 +144,8 @@ pub trait ActionStore<Ctx>: Send + Sync {
 
 | 包 | 提供 | 宿主要实现 |
 |---|---|---|
-| `chatweave_core` | 不可变模型类（手写 `fromJson` / `toJson`，**不依赖 build_runner**，减少宿主的依赖负担）；`SseDecoder`（字节流 → SSE 帧，可接任何 HTTP 客户端的字节流）；`EventParser`；`BlockStore`（单一写入口，按 `seq` 去重、按块 ID 合并、`rev` 规则、与持久化版本对账、按消息 `id` 对账乐观用户消息——用户消息 ID 由客户端生成）；`StreamController`（续传状态机、触发时机、退避与上限、“已请求停止”状态、临时进度提示、按会话找回正在生成的消息）；`InteractionController`（交互块的本地显示状态与幂等键）；`ViewportController`（纯函数的滚动状态机）；`inspect()` 只读快照；`Limits` 检查；`MemoryTransport` / `ScriptedTransport` 与宿主实现一致性套件 | `ChatWeaveStore`（持久化消息与续传进度，例如用 drift）、`StreamTransport`（打开 SSE 字节流，例如用 dio）、`ActionTransport`（提交动作，例如走离线队列；可以不提供，此时交互块只读） |
-| `chatweave_flutter` | `ChatWeaveList`（消息列表）、`ChatWeaveComposer`（输入框）、`MessageView`、`MarkdownBlockView`（基于 `flutter_markdown_plus` 的受限子集）、`BlockRegistry`（含按块的错误隔离）、默认组件、`ChatWeaveTheme` 主题接口与中性浅色 / 深色默认主题；可选的只读调试面板 `ChatWeaveDebugOverlay` | `ChatWeaveThemeData` 的实现（品牌皮肤）、自定义块组件（例如业务卡片）、可选的用户消息 / 消息外框构建器 |
+| `chatweave_core` | 不可变模型类（手写 `fromJson` / `toJson`，**不依赖 build_runner**，减少宿主的依赖负担）；`SseDecoder`（字节流 → SSE 帧，可接任何 HTTP 客户端的字节流）；`EventParser`；`BlockStore`（单一写入口，按 `seq` 去重、按块 ID 合并、运行步骤与块分开保存、`rev` 规则、与持久化版本对账、按消息 `id` 对账乐观用户消息——用户消息 ID 由客户端生成）；`StreamController`（续传状态机、触发时机、退避与上限、“已请求停止”状态、临时进度提示、按会话找回正在生成的消息）；`InteractionController`（交互块的本地显示状态与幂等键）；`ViewportController`（纯函数的滚动状态机）；`inspect()` 只读快照；`Limits` 检查；`MemoryTransport` / `ScriptedTransport` 与宿主实现一致性套件 | `ChatWeaveStore`（持久化消息与续传进度，例如用 drift）、`StreamTransport`（打开 SSE 字节流，例如用 dio）、`ActionTransport`（提交动作，例如走离线队列；可以不提供，此时交互块只读） |
+| `chatweave_flutter` | `ChatWeaveList`（消息列表）、`ChatWeaveComposer`（输入框）、`MessageView`（含正文之上的运行过程条 `ProcessStrip`）、`MarkdownBlockView`（基于 `flutter_markdown_plus` 的受限子集）、`BlockRegistry`（含按块的错误隔离）、默认组件、`ChatWeaveTheme` 主题接口与中性浅色 / 深色默认主题；可选的只读调试面板 `ChatWeaveDebugOverlay` | `ChatWeaveThemeData` 的实现（品牌皮肤）、自定义块组件（例如业务卡片）、可选的用户消息 / 消息外框构建器 |
 
 存储接口草图（示意）：
 
@@ -200,6 +200,10 @@ sequenceDiagram
   App->>API: GET …/messages/{id}/stream（SSE）
   API->>Agent: 开始一轮
   API-->>App: message.activity（可选的临时进度，如“正在查天气…”；无 seq，不入日志）
+  Agent->>API: 工具调用 get_week_weather / list_todos（并行）
+  API-->>App: step.started（宿主写的标签，如“查北京本周天气”；有 seq，入日志）
+  API->>Tool: 执行查询
+  API-->>App: step.finished（succeeded / failed + 耗时，可选一行说明；不含参数与结果）
   Agent-->>API: 文字 token
   API-->>App: block.start(markdown) / block.delta…
   Agent->>API: 工具调用 get_weather
@@ -267,6 +271,7 @@ sequenceDiagram
 - Markdown 与结构化组件混排；语义 IR（10 个内置类型 + 自定义类型）。
 - 客户端注册表的确定性映射；降级链；Markdown-only 模式。
 - 流式：Markdown 增量、组件整块；稳定块 ID、按 ID 补丁、幂等事件、`Last-Event-ID` 续传、快照回退；持久化版本优先；显式停止、临时进度事件、按会话找回正在生成的消息。
+- 运行过程：步骤事件（对齐 AG-UI 1.0 的 `STEP_STARTED` / `STEP_FINISHED`），消息顶部的过程条（生成中展开、结束后自动收起），随消息保存精简的步骤记录（D48–D52）。
 - 基础 Schema 校验与限制。
 - 最小动作集：`choice.select`、`confirmation.respond`、`form.submit`，服务端注册表 + 参数校验 + 宿主权限 + 破坏性确认。
 - 示例 App 与 golden 测试；一致性夹具；宿主实现一致性套件；只读调试面板。

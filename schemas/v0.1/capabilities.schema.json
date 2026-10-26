@@ -30,6 +30,7 @@
           "stream.resume",
           "stream.snapshot",
           "stream.activity",
+          "stream.steps",
           "action.choice",
           "action.confirmation",
           "action.form",

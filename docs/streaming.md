@@ -8,6 +8,7 @@
 - 组件块在它该在的位置先出现占位，数据到达时整块填满；v1 不做组件字段级增量。
 - 事件可以重复、可以断线，客户端最终状态与服务端持久化的消息一致；**断线 / 离线之后以持久化版本为准**。
 - 普通 Markdown 回复不因为 UI 系统额外变慢：不额外调用模型，不额外往返。
+- AI 回答前做的几件事（查数据、对比、等用户确认）作为**运行步骤**在同一条流里下发，显示在消息顶部的“过程”条里；它们和块事件一样可续传、可折叠，但与内容分开存放（[protocol.md 4.7](protocol.md#47-运行步骤stepstarted--stepfinished)）。
 
 ## 2. 端到端示例
 
@@ -87,6 +88,36 @@
 ```
 
 客户端在 b2 的占位旁显示最新一条提示；seq 7 的 `block.data` 到达时清除。
+
+### 2.5 运行步骤
+
+另一条消息：用户问“对比一下北京和上海这周的天气，再看看我这周的待办”。助手先并行查两个城市（上海的查询失败），再读待办，然后回答。步骤事件和块事件在同一条流里、共用同一个 `seq` 序列（[protocol.md 4.7](protocol.md#47-运行步骤stepstarted--stepfinished)）：
+
+```json
+{"protocolVersion":"0.1","type":"message.start","messageId":"msg_02","seq":1,"message":{"id":"msg_02","role":"assistant","conversationId":"conv_42","createdAt":"2026-10-26T09:40:00Z"}}
+{…,"type":"step.started","seq":2,"stepId":"s1","label":"查北京本周天气"}
+{…,"type":"step.started","seq":3,"stepId":"s2","label":"查上海本周天气"}
+{…,"type":"step.finished","seq":4,"stepId":"s1","state":"succeeded","durationMs":800}
+{…,"type":"step.finished","seq":5,"stepId":"s2","state":"failed","durationMs":1200,"summary":"天气服务暂时不可用"}
+{…,"type":"step.started","seq":6,"stepId":"s3","label":"读取本周待办"}
+{…,"type":"step.finished","seq":7,"stepId":"s3","state":"succeeded","durationMs":300,"summary":"找到 3 件"}
+{…,"type":"block.start","seq":8,"blockId":"b1","index":0,"blockType":"markdown","schemaVersion":1}
+{…,"type":"block.delta","seq":9,"blockId":"b1","delta":{"text":"北京这周都是晴天；上海的天气暂时查不到。你这周还有 3 件待办，最近的是周三交水费。"}}
+{…,"type":"block.end","seq":10,"blockId":"b1","status":"complete"}
+{…,"type":"message.end","seq":11,"status":"complete","blockCount":1,"rev":1,"fallbackText":"北京这周都是晴天；上海的天气暂时查不到。你这周还有 3 件待办，最近的是周三交水费。"}
+```
+
+折叠后，持久化消息除了 `blocks` 之外多一个 `steps`（`fallbackText` 和 `blockCount` 都不包含步骤）：
+
+```json
+{"steps":[{"id":"s1","label":"查北京本周天气","state":"succeeded","durationMs":800},{"id":"s2","label":"查上海本周天气","state":"failed","durationMs":1200,"summary":"天气服务暂时不可用"},{"id":"s3","label":"读取本周待办","state":"succeeded","durationMs":300,"summary":"找到 3 件"}]}
+```
+
+界面上：seq 2–7 期间过程条展开，逐行显示“查北京本周天气 ✓ 0.8 秒”“查上海本周天气 · 失败”“读取本周待办 ⏳”；上海失败不影响其他步骤，也不影响回答。`message.end` 到达后过程条自动收起成一行“查了 3 项（1 项失败）· 用时 4 秒”，点按可展开（[rendering.md 4.3](rendering.md#43-运行过程条processstrip)）。
+
+**变体：等用户确认。** 用户说“把交水费删了”：服务端开始步骤“准备删除待办”，暂存待执行的删除操作，发出确认块 `b2`，再发 `step.finished{state: "awaiting_user", blockId: "b2"}`，然后以 `complete` 结束消息。过程条这一行显示“等你确认”，确认卡在正文里；用户确认后这一行跟着块的状态显示“已确认”，真正的删除和后续回答在 `followUp` 的新消息里，有自己的步骤。
+
+**变体：生成中停止。** 步骤 s3 还在运行时用户按停止：服务端先发 `step.finished{stepId: "s3", state: "cancelled"}`，再发 `message.end{status: "interrupted", error.code: "cancelled"}`。
 
 ## 3. SSE 封装
 
@@ -170,7 +201,7 @@ data: {"protocolVersion":"0.1","type":"block.start","messageId":"msg_01","seq":2
 
 如果 `N` 早于日志里最早的事件、日志已清理、或宿主根本不保留日志，服务端发送 `message.snapshot`：
 
-- 内容是此刻的完整消息（生成中则 `status = streaming`、`rev = 0`）。
+- 内容是此刻的完整消息（生成中则 `status = streaming`、`rev = 0`），包括运行步骤 `steps`（生成中可能有 `running` 的步骤，之后照常接收它们的 `step.finished`）。
 - 它的 `seq` 等于快照所反映的最后一个事件的 `seq`。消费方在 `snapshot.seq ≥ 已应用 seq` 时用它**整体替换**本地状态，并把已应用 seq 设为 `snapshot.seq`，之后照常接收后续事件。
 - 宿主因此需要随消息保存“最后一个 seq”。
 
@@ -237,16 +268,20 @@ data: {"protocolVersion":"0.1","type":"block.start","messageId":"msg_01","seq":2
 | `block.patch` | 对块的 `{data, fallbackText, metadata}` 做 JSON Merge Patch；带 `rev` 时按 `rev` 规则判断是否应用 |
 | `message.end.blockCount` 与本地块数不符 | 本地缺块：请求快照或等同步结果替换 |
 | 同步送来的持久化版本 | `rev ≥ 本地 rev` 时整体替换本地版本（包括本地生成中的临时状态）；**临时状态永远不会覆盖持久化版本** |
-| `message.activity`（无 `seq`） | 不经过 seq 规则、不改变消息内容，只更新这条消息的“当前提示”；下一个带 `seq` 的事件、新提示或 `message.end` 到达时替换或清除 |
+| `message.activity`（无 `seq`） | 不经过 seq 规则、不改变消息内容，只更新这条消息的“当前提示”；下一个带 `seq` 的事件、新提示或 `message.end` 到达时替换或清除。有步骤处于 `running` 时提示不显示（以步骤为准） |
+| `step.started` | 在消息的 `steps` 末尾追加 `{id, label, state: running}`；不碰 `blocks`。重复的 `stepId` 视为协议错误（同重复的 `blockId`） |
+| `step.finished` | 把对应步骤改成最终状态并写入 `durationMs`、`summary`、`blockId`；对未开始或已结束的步骤发 `step.finished` 视为协议错误 |
+| 未声明 `stream.steps` 的客户端 | 步骤事件按未知事件类型处理：忽略内容、照常推进 `seq` |
 
 ## 6. 中断与不完整的块
 
 | 场景 | 服务端行为 | 客户端显示 |
 |---|---|---|
-| 用户点“停止生成”（显式停止请求，见 4.4） | 停止生产，发 `message.end{status: interrupted, error.code: cancelled}`，持久化已产出的部分 | 已出现的内容保留（不清空、不回退），末尾标“已停止”；断线**不**属于这种情况 |
+| 用户点“停止生成”（显式停止请求，见 4.4） | 停止生产；仍在运行的步骤各发一个 `step.finished{state: cancelled}`，再发 `message.end{status: interrupted, error.code: cancelled}`，持久化已产出的部分 | 已出现的内容保留（不清空、不回退），末尾标“已停止”；过程条里被停下的步骤显示“已停止”；断线**不**属于这种情况 |
+| 某个步骤失败（工具出错、超时） | 发 `step.finished{state: failed, summary?}`，其他步骤和回答照常继续 | 过程条里只有这一行显示失败，不影响其他行和正文 |
 | 上游模型失败 | 已有内容保留，`message.end{status: interrupted 或 error}`；全无内容时 `fallbackText` 说明原因 | 显示已有内容 + 一行错误说明，宿主可提供“重试” |
 | 某个组件块的数据没拿到（工具失败、校验失败） | `block.end{status: error, fallbackText: "天气数据暂时无法获取"}`，消息继续 | 占位原地换成一行兜底文字，不移除块、不影响后续块 |
-| 服务端进程崩溃 | 重启后扫描超过租约仍为 `streaming` 的消息：有持久日志时用同一个折叠函数把日志折叠成消息；默认的进程内缓冲时用最近的检查点（4.1）。标 `interrupted` 并持久化 | 续传时拿到剩余事件或快照（默认实现下是快照） |
+| 服务端进程崩溃 | 重启后扫描超过租约仍为 `streaming` 的消息：有持久日志时用同一个折叠函数把日志折叠成消息；默认的进程内缓冲时用最近的检查点（4.1）。仍在运行的步骤记为 `failed`，消息标 `interrupted` 并持久化 | 续传时拿到剩余事件或快照（默认实现下是快照） |
 | 客户端离线 | — | 停在已收到的状态；未完成的 markdown 文本末尾不显示闪烁光标，改显示“连接中断”；联网后续传或从同步拿最终版本 |
 
 **生成中的消息是“预览”，不是记录**：在拿到 `message.end` 或持久化版本之前，消息不显示复制、转发、引用等操作栏（避免复制到半截内容），也不参与搜索与通知；结束后才出现这些操作。
@@ -260,8 +295,9 @@ data: {"protocolVersion":"0.1","type":"block.start","messageId":"msg_01","seq":2
 3. **只重排变化的部分**：markdown 渲染把文本分成“已稳定段落”（最后一个不在代码块内的空行之前）和“活动尾部”，每批 delta 只重新解析尾部；已稳定段落的组件树复用。
 4. **批量刷新**：每帧最多重建一次；同一帧内到达的多个 delta 合并（约 16–50ms 一批），避免逐 token 重建。
 5. **滚动跟随**：用户停在列表底部时，新内容出现自动跟随；用户向上翻看时不跟随、画面不动，改为显示“有新内容”按钮。正在生成的消息变长**不算**“新消息”，不增加未读计数。
-6. **读屏不刷屏**：不逐 token 播报；块结束或消息结束时播报一次（见 [rendering.md](rendering.md#6-无障碍)）。
-7. **滚动由一个纯函数状态机决定**：`chatweave_core` 里的 `ViewportController` 是 `(视口状态, 事件, 测量结果) → 新视口状态` 的纯函数，阶段包括“打开中 / 定位中 / 稳定 / 用户滚动中 / 跟随最新”。锚点用“消息 ID + 块 ID + 像素偏移”表示，而不是绝对滚动位置，所以在上方插入历史消息或某个组件变高时，用户正在看的内容不会移动。`chatweave_flutter` 只负责测量和应用，**全库只有一个地方写滚动位置**；“有新内容”按钮、以及交给宿主的可见性回调（宿主可以据此做自己的已读逻辑）都从这个状态推导。这让最难测的滚动行为可以在纯 Dart 里做单元测试。
+6. **过程条在消息顶部**：它在第一个块之上。生成中新步骤追加在过程条末尾，会把下方已出现的内容往下推；这和组件变高一样由锚点规则处理（第 8 条），用户正在看的内容不动。`message.end` 时过程条收起成一行，高度变化用尺寸过渡。
+7. **读屏不刷屏**：不逐 token 播报；块结束或消息结束时播报一次（见 [rendering.md](rendering.md#6-无障碍)）。
+8. **滚动由一个纯函数状态机决定**：`chatweave_core` 里的 `ViewportController` 是 `(视口状态, 事件, 测量结果) → 新视口状态` 的纯函数，阶段包括“打开中 / 定位中 / 稳定 / 用户滚动中 / 跟随最新”。锚点用“消息 ID + 块 ID + 像素偏移”表示，而不是绝对滚动位置，所以在上方插入历史消息或某个组件变高时，用户正在看的内容不会移动。`chatweave_flutter` 只负责测量和应用，**全库只有一个地方写滚动位置**；“有新内容”按钮、以及交给宿主的可见性回调（宿主可以据此做自己的已读逻辑）都从这个状态推导。这让最难测的滚动行为可以在纯 Dart 里做单元测试。
 
 ## 8. 背压与资源
 

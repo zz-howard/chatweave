@@ -41,6 +41,12 @@
       "type": "object",
       "maxProperties": 16
     },
+    "steps": {
+      "description": "Compact run trace (docs/protocol.md 4.7): the steps the assistant took while producing this message, in step.started order. Stored separately from blocks: steps take no block index, are not counted in blockCount and are never part of fallbackText. Each entry holds only id, host-written label, state, duration and an optional host-written one-line summary (plus blockId for awaiting_user). Never tool names, arguments, raw results or model text (including reasoning). Omitted when there were no steps. Step ids must be unique within the message (checked by the library, not expressible here).",
+      "type": "array",
+      "maxItems": 32,
+      "items": { "$ref": "#/$defs/traceStep" }
+    },
     "view": {
       "description": "RESERVED for the Phase 2 View protocol (layout planning that references block data by id). Must not be emitted in 0.1; clients ignore it.",
       "not": {}
@@ -50,12 +56,87 @@
     {
       "if": { "properties": { "status": { "const": "streaming" } } },
       "then": { "properties": { "rev": { "const": 0 } } },
-      "else": { "properties": { "rev": { "minimum": 1 } } }
+      "else": {
+        "properties": {
+          "rev": { "minimum": 1 },
+          "steps": {
+            "$comment": "Once the message has ended, every step has ended too: the producer emits step.finished for each started step before message.end.",
+            "items": { "properties": { "state": { "not": { "const": "running" } } } }
+          }
+        }
+      }
     },
     {
       "$comment": "Client-generated user message ids double as idempotency keys, so they must be long enough to be unique (same rule as action ids). The former separate clientMessageId field was removed (see decisions D43).",
       "if": { "properties": { "role": { "const": "user" } }, "required": ["role"] },
       "then": { "properties": { "id": { "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{7,127}$" } } }
+    },
+    {
+      "$comment": "Steps belong to assistant / system messages only.",
+      "if": { "properties": { "role": { "const": "user" } }, "required": ["role"] },
+      "then": { "not": { "required": ["steps"] } }
     }
-  ]
+  ],
+  "$defs": {
+    "stepId": {
+      "description": "Stable within its message; pairs step.started with step.finished (maps to AG-UI stepName).",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+    },
+    "stepLabel": {
+      "description": "Host-written, user-facing description of the step, e.g. 'Checking this week's weather in Beijing'. Never a raw tool name, tool arguments or model output.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60
+    },
+    "stepSummary": {
+      "description": "Optional host-written one-line result note from a per-tool template, e.g. 'Found 3 tasks' or 'Weather service unavailable'. Never raw results or model output.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "stepEndState": {
+      "description": "succeeded / failed (affects only this step) / awaiting_user (the run handed over to the user; blockId points at the interaction block in the content) / cancelled (still running when the user stopped the generation).",
+      "type": "string",
+      "enum": ["succeeded", "failed", "awaiting_user", "cancelled"]
+    },
+    "durationMs": {
+      "description": "Elapsed time of the step in milliseconds (a duration, not a point in time).",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 86400000
+    },
+    "traceStep": {
+      "type": "object",
+      "required": ["id", "label", "state"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/stepId" },
+        "label": { "$ref": "#/$defs/stepLabel" },
+        "state": {
+          "description": "running only while the message is streaming (snapshots, checkpoints); never in a message that has ended.",
+          "type": "string",
+          "enum": ["running", "succeeded", "failed", "awaiting_user", "cancelled"]
+        },
+        "durationMs": { "$ref": "#/$defs/durationMs" },
+        "summary": { "$ref": "#/$defs/stepSummary" },
+        "blockId": {
+          "description": "awaiting_user only: the interaction block (choice / confirmation / form_intent) in this message's content that waits for the user.",
+          "$ref": "content-block.schema.json#/$defs/blockId"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "const": "running" } } },
+          "then": { "not": { "anyOf": [ { "required": ["durationMs"] }, { "required": ["summary"] } ] } },
+          "else": { "required": ["durationMs"] }
+        },
+        {
+          "if": { "properties": { "state": { "const": "awaiting_user" } } },
+          "then": { "required": ["blockId"] },
+          "else": { "not": { "required": ["blockId"] } }
+        }
+      ]
+    }
+  }
 }

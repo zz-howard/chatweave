@@ -52,6 +52,7 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 | `blocks` | ✅ | 内容块，最多 64 个 |
 | `fallbackText` | ✅ | **整条消息的纯文本版本，任何状态下都必须有**。用于只会显示文本的客户端、系统通知、读屏、搜索 |
 | `rev` | ✅ | 持久化版本号：生成中为 0；完成时为 1；之后每次变化（例如选项块被回答）+1。**同步时 rev 大的版本获胜** |
+| `steps` | | 运行步骤的精简记录（见 4.7）：每步只有 `id`、`label`、`state`、`durationMs`，以及可选的 `summary`、`blockId`。**与 `blocks` 分开存放**，不占块位置、不计入 `blockCount`、不进 `fallbackText`；没有步骤时省略。只出现在助手 / 系统消息上 |
 | `metadata` | | 宿主自用的不透明数据（如追踪 ID），库不渲染 |
 | `view` | | **保留**给 Phase 2 的 View 协议，0.1 中不得出现 |
 
@@ -191,6 +192,8 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 ```
 `state`：`pending` / `running` / `waiting` / `succeeded` / `failed` / `cancelled`。
 
+`status` 块是**内容**：它描述的是回答里要交代的事情（例如宿主某个后台任务的进度），会留在消息正文里。AI 回答这条消息时自己做了哪些步骤，用 4.7 的运行步骤，不用 `status` 块。
+
 #### `choice`（交互块）
 
 ```json
@@ -284,7 +287,7 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 | `protocolVersion` | 如 `"0.1"` |
 | `type` | 事件类型，见下表 |
 | `messageId` | 所属消息 |
-| `seq` | **每条消息从 1 开始、每个事件严格 +1** 的序号。临时事件（`message.activity`，见 4.5）**没有** `seq` |
+| `seq` | **每条消息从 1 开始、每个事件严格 +1** 的序号。临时事件（`message.activity`，见 4.5）**没有** `seq`；运行步骤事件（4.7）和块事件一样**有** `seq` |
 | `ts` | 可选，服务端时间 |
 
 ### 4.2 事件类型
@@ -301,6 +304,8 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 | `message.snapshot` | `message`（完整消息） | 续传时无法按序重放、或服务端不保留事件日志时，直接发完整状态 |
 | `error` | `error{code, message, retryable}`、`blockId?` | 流级错误 |
 | `message.activity` | `activity{phase, label?}`，**无 `seq`** | 临时进度提示，只用于显示（见 4.5） |
+| `step.started` | `stepId`、`label` | 一个运行步骤开始（`running`），见 4.7。对应 AG-UI 的 `STEP_STARTED` |
+| `step.finished` | `stepId`、`state`、`durationMs`、`summary?`、`blockId?` | 这个步骤结束：`succeeded` / `failed` / `awaiting_user` / `cancelled`。对应 AG-UI 的 `STEP_FINISHED` |
 
 **JSON Merge Patch**（RFC 7396，“合并补丁”）：补丁对象里出现的字段覆盖原值，值为 `null` 表示删除该字段，数组整体替换。它比逐条操作的 JSON Patch（RFC 6902）简单，足够表达 v1 的状态更新。
 
@@ -331,7 +336,7 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 - SSE 帧里没有 `id:` 行，`Last-Event-ID` 不受影响。
 - 客户端只保留最新的一条提示；该消息的下一个带 `seq` 的事件、新的 `message.activity` 或 `message.end` 到达时替换或清除。断线重连后提示消失，直到服务端再发。
 - 服务端只向声明了 `stream.activity` 能力（7.2）的客户端发送。没声明的客户端看不到提示，内容不受影响。
-- 它不是运行过程事件：将来展示工具步骤时仍按 [10.1](#101-运行过程事件参照-ag-ui) 对齐 AG-UI。
+- 它不是运行步骤。有具体步骤（查什么、对比什么、等用户确认）时用 4.7 的步骤事件；`message.activity` 只留给**没有具体步骤**的笼统等待，例如第一个步骤之前的“已受理”、步骤之间模型在组织回答时的“仍在处理”、上游变慢时的“可能慢一些”。两者同时存在时，界面以步骤为准（见 4.7）。
 
 ### 4.6 生成控制：开始、停止、找回
 
@@ -340,6 +345,44 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 1. **开始：同步返回助手消息 ID**（[D41](decisions.md)）。宿主的“提交用户消息”接口**必须**在生成开始前返回 `{userMessageId, messageId, streamable}`（`messageId` 是这次回复的助手消息 ID）。同一个用户消息 ID 重复提交（例如离线重发、超时重试）返回同一个 `messageId`，`replayed: true`，不会开始第二次生成。
 2. **停止：显式请求，与断线严格区分**（[D39](decisions.md)）。`POST {宿主前缀}/messages/{messageId}/stop`，幂等。服务端取消生成，持久化已产出的部分，发 `message.end{status: "interrupted", error.code: "cancelled"}`；响应 `{messageId, status: "stopping" | "already_ended"}`。**关闭连接、切后台、离开页面、App 被杀都只是断线**，不是停止，生成照常继续，之后可以续传。谁能停止由宿主授权（例如只允许发起这一轮的用户）。
 3. **找回：按会话查询正在生成的消息**（[D41](decisions.md)）。`GET {宿主前缀}/conversations/{conversationId}/active-messages` → `{conversationId, messages: [{messageId, lastSeq, replyTo?}]}`，没有就返回空列表。用于“提交了用户消息、还没收到助手消息 ID 时 App 就被杀”的空窗：重启后先查一次，再按 `messageId` 续传。群聊里同一会话可能同时有几条在生成，所以是列表。
+
+### 4.7 运行步骤（`step.started` / `step.finished`）
+
+助手回答之前常常要先做几件事：查数据、对比、等用户确认。步骤事件让界面在这条消息顶部显示一条“过程”，告诉用户 AI 正在做什么、做完了哪些（[D48](decisions.md)–[D52](decisions.md)；界面见 [rendering.md 4.3](rendering.md#43-运行过程条processstrip)）。事件名和字段对齐 AG-UI 1.0 的 `STEP_STARTED` / `STEP_FINISHED`，差异逐条列在 [10.1](#101-运行过程事件对齐-ag-ui)。
+
+```json
+{"protocolVersion":"0.1","type":"step.started","messageId":"msg_02","seq":2,"stepId":"s1","label":"查北京本周天气"}
+{"protocolVersion":"0.1","type":"step.started","messageId":"msg_02","seq":3,"stepId":"s2","label":"查上海本周天气"}
+{"protocolVersion":"0.1","type":"step.finished","messageId":"msg_02","seq":4,"stepId":"s1","state":"succeeded","durationMs":800}
+{"protocolVersion":"0.1","type":"step.finished","messageId":"msg_02","seq":5,"stepId":"s2","state":"failed","durationMs":1200,"summary":"天气服务暂时不可用"}
+{"protocolVersion":"0.1","type":"step.finished","messageId":"msg_03","seq":6,"stepId":"s1","state":"awaiting_user","durationMs":300,"blockId":"b2"}
+```
+
+前四行是两个并行的查询，一个成功、一个失败；最后一行来自另一条消息：删除待办之前等用户在确认卡 `b2` 上确认。完整的事件序列与折叠结果见 [streaming.md 2.5](streaming.md#25-运行步骤)。
+
+**字段**
+
+- `stepId`：在这条消息内唯一且稳定，用来把开始和结束配成一对。
+- `label`：**宿主写的**、给人看的一句话（最长 60 字符），例如“查北京本周天气”“对比上周”。宿主为每种工具 / 处理预先写好标签，可以填入经过整理的对象名（如城市名）；它**不是**工具名、调用参数，也不是模型输出。
+- `state`（只在 `step.finished` 上）：`succeeded`（完成）/ `failed`（失败）/ `awaiting_user`（这一步要等用户回答或确认，运行在这里交给用户；**必须**带 `blockId`）/ `cancelled`（用户停止生成时还在运行）。`step.started` 本身就表示 `running`。
+- `durationMs`：这一步从开始到结束的毫秒数。它是时长，不是时间点，不受第 1 节“时间只用 RFC 3339”的约束。
+- `summary`（可选，最长 120 字符）：宿主按工具提供的一行结果说明，例如“找到 3 件待办”“天气服务暂时不可用”，由宿主模板生成。**原始查询结果不下发**。
+- `blockId`（只用于 `awaiting_user`）：指向**正文里**等待用户的交互块（`choice` / `confirmation` / `form_intent`）。确认卡、选项本身在正文里，过程条里只显示“等你确认 / 等你回答”。
+
+**规则**
+
+1. **每个步骤只结束一次**，结束后不再变化。生产方在 `message.end` 之前**必须**为每个已开始的步骤发出 `step.finished`：用户按停止时仍在运行的步骤记为 `cancelled`。已结束的消息里不会有 `running` 的步骤；服务端崩溃后按检查点或日志恢复时，仍在运行的步骤记为 `failed`。
+2. **失败只影响自己这一行**：一个步骤 `failed` 不影响其他步骤，也不会让消息失败；消息是否成功只看 `message.end.status`。宿主通常会让 Agent 带着“这一步没查到”继续回答。
+3. **可以并行**：多个步骤可以同时处于 `running`。显示顺序 = `step.started` 的顺序。v1 只有一层，没有子步骤。
+4. **带 `seq`，和块事件一样可靠**：写事件日志、续传时重放、进快照（`message.snapshot` 里的 `message.steps`，生成中可能含 `running`）。`fold(events) == 持久化消息` 包括步骤：`step.started` 追加 `{id, label, state: "running"}`，`step.finished` 把这一项改成最终状态并写入 `durationMs`、`summary`、`blockId`。对未开始的步骤发 `step.finished`、重复的 `stepId` 开始，都按协议错误处理（与块相同）。
+5. **与内容分开**：步骤折叠进消息的 `steps` 字段，不是内容块：不占 `index`，不计入 `blockCount`，不进 `fallbackText`。只会显示文本的客户端、通知、搜索都看不到过程。
+6. **持久化的只是精简记录**：`message.end` 时随消息保存的每一步只有 `id`、`label`、最终 `state`、`durationMs`，以及可选的 `summary`、`blockId`。**不含**工具名、参数、原始数据或模型文字。
+7. **不传模型的思考过程**：模型的推理 / 思考文字（AG-UI 的 `REASONING_*`）**从不**下发，不进事件、事件日志或消息，也不用来生成 `label` / `summary`。
+8. **等用户确认**：`awaiting_user` 是这一轮运行的终点——运行挂起，消息照常结束（通常 `complete`）。用户回答后，客户端按 `blockId` 指向的块的**当前状态**显示这一行（`open` 时“等你确认”，之后“已确认 / 已回答 / 已取消 / 已过期”），步骤记录本身保持 `awaiting_user` 不变，不需要再补丁。回答之后的继续执行是新的一轮（动作结果里的 `followUp` 消息），有自己的步骤。
+9. **对所有订阅者都发出**：步骤事件带 `seq`，按接收者删掉会造成跳号。没声明 `stream.steps` 能力（7.2）的客户端把它们当作未知事件类型：忽略内容、照常推进 `seq`；持久化消息里的 `steps` 字段同样忽略（宽进严出）。内容照常显示。服务端可以为这类客户端额外发 `message.activity{phase: "working", label: 当前步骤的 label}`，让它们仍能看到一句提示；对声明了 `stream.steps` 的客户端不必再发重复的提示。
+10. **与 `message.activity` 的关系**：有步骤正在运行时，客户端以步骤为准，不再单独显示 activity 提示；没有正在运行的步骤时（例如第一个步骤之前、步骤之间模型在组织回答时）照常显示 activity。
+11. **按接收者替换，不删除（仅群聊）**：步骤细节对谁可见由宿主按接收者决定（[security.md 第 6 节](security.md#6-隐私)）。要对某位接收者隐藏细节时，宿主**替换**而不是删除：把 `label` 换成笼统的说法（如“处理一项请求”），去掉 `summary`，事件条数和 `seq` 保持不变；同步下发的 `steps` 也同样处理。一对一会话只有一位用户，不存在这个问题。
+
 ## 5. Action 协议（v1 最小集合）
 
 定义见 [`action.schema.json`](../schemas/v0.1/action.schema.json)。
@@ -448,7 +491,7 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 {
   "protocolVersions": ["0.1"],
   "blocks": { "markdown": 1, "metric": 1, "metric_group": 1, "dataset": 1, "time_series": 1, "status": 1, "choice": 1, "confirmation": 1, "form_intent": 1, "x-todo.task_card": 1 },
-  "features": ["stream.resume", "stream.snapshot", "stream.activity", "action.choice", "action.confirmation", "action.form"],
+  "features": ["stream.resume", "stream.snapshot", "stream.activity", "stream.steps", "action.choice", "action.confirmation", "action.form"],
   "locale": "zh-CN"
 }
 ```
@@ -456,7 +499,7 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 放不进请求体的场合（例如 SSE 的 GET 请求）用紧凑请求头：
 
 ```
-ChatWeave-Capabilities: v=0.1; blocks=markdown:1,metric:1,metric_group:1,dataset:1,time_series:1,status:1,choice:1,confirmation:1,form_intent:1; features=stream.resume,action.choice
+ChatWeave-Capabilities: v=0.1; blocks=markdown:1,metric:1,metric_group:1,dataset:1,time_series:1,status:1,choice:1,confirmation:1,form_intent:1; features=stream.resume,stream.steps,action.choice
 ```
 
 服务端的用法：
@@ -504,6 +547,8 @@ ChatWeave-Protocol: 0.1
 | `form_intent.fields` / 每字段选项 | 12 / 20 |
 | 普通标签 / 短按钮文字 / 说明文字 | 120 / 24 / 2000 字符 |
 | `fallbackText`（块 / 消息） | 2000 / 16000 字符 |
+| 每条消息的运行步骤 | 32 |
+| 步骤 `label` / `summary` | 60 / 120 字符 |
 
 数量与长度上限写在 Schema 里；字节大小、深度、节点数由库的 `Limits` 校验（Schema 难以表达）。宿主可以把限制**调得更严**，不能调得比协议默认更宽（否则别的消费方可能拒收）。超限时生产方必须截断（并填 `totalRows` 之类的说明）或改发 markdown，不得发出超限块。
 
@@ -524,11 +569,31 @@ ChatWeave-Protocol: 0.1
 
 不打算映射的部分：A2UI 的双向数据绑定和客户端函数求值（ChatWeave v1 不需要，且会扩大安全面）。
 
-### 10.1 运行过程事件：参照 AG-UI
+### 10.1 运行过程事件：对齐 AG-UI
 
-A2UI 管的是“内容长什么样”，而“Agent 正在做什么”（运行开始 / 结束、工具调用、思考中）是另一个层面的信息。ChatWeave v1 不展示运行过程（`status` 块是内容，不是运行事件）。将来如果要展示，**事件名和字段采用 [AG-UI](https://github.com/ag-ui-protocol/ag-ui) 1.0 的定义**（例如 `RUN_STARTED`、`TOOL_CALL_START`），ChatWeave 自己的信息放在外层信封里，并维护一张“与 AG-UI 不同之处”的扩展清单，每处扩展单独列出理由。形成“内容对齐 A2UI、过程对齐 AG-UI”的格局。
+A2UI 管的是“内容长什么样”，而“Agent 正在做什么”（运行开始 / 结束、步骤、工具调用、思考）是另一个层面的信息，[AG-UI](https://github.com/ag-ui-protocol/ag-ui) 是这方面的协议。ChatWeave v1 展示运行步骤（4.7，[D48](decisions.md)），事件名和字段对齐 **AG-UI 1.0**（协议 1.0 于 2026-09-17 发布，以其仓库中的 `spec/1.0/schema.json` 为准，2026-10-26 核对）。形成“内容对齐 A2UI、过程对齐 AG-UI”的格局。
 
-同理，Phase 3 中“确认后交回 Agent 继续”的交互，`ActionSpec` 可以带一个不透明的 `toolCallId`，dispatcher 把用户的回答作为那次工具调用的结果交回宿主的 Agent 运行时，形状上对齐 AG-UI 的中断（interrupt）模式。0.1 不包含这个字段。
+| ChatWeave | AG-UI 1.0 | 说明 |
+|---|---|---|
+| `message.start` / `message.end` | `RUN_STARTED` / `RUN_FINISHED`；`RUN_ERROR` | 一条助手消息 = 一次运行。消息以 `awaiting_user` 步骤结束 ≈ `RUN_FINISHED.outcome.type = "interrupt"`；用户停止（`interrupted` + `cancelled`）≈ `outcome.type = "cancelled"` |
+| `step.started{stepId, label}` | `STEP_STARTED{stepName, metadata?}` | 转换时 `stepName = stepId`，`label` 放进 `metadata.label` |
+| `step.finished{stepId, state, durationMs, summary?, blockId?}` | `STEP_FINISHED{stepName, metadata?}` | 转换时 `stepName = stepId`，其余字段放进 `metadata` |
+| （不下发） | `TOOL_CALL_START` / `TOOL_CALL_ARGS` / `TOOL_CALL_END` / `TOOL_CALL_RESULT` / `TOOL_CALL_CHUNK` | 见下方第 5 条 |
+| （不下发） | `REASONING_*`（1.0 已移除旧的 `THINKING_*`） | 见下方第 6 条 |
+| `message.activity` | 无直接对应 | AG-UI 的 `ACTIVITY_SNAPSHOT` / `ACTIVITY_DELTA` 是会留在消息列表里的活动消息；ChatWeave 的 activity 是不进日志、不持久化的临时提示（4.5），两者含义不同，不做映射 |
+
+**与 AG-UI 不同之处（扩展清单）**，每处单列理由：
+
+1. **事件名写法**：`step.started` / `step.finished`（小写、点分），对应 `STEP_STARTED` / `STEP_FINISHED`。理由：与 ChatWeave 已有事件的命名一致；一一对应，适配器只做机械改写。
+2. **外层信封**：用 ChatWeave 的 `protocolVersion`、`messageId`、`seq`、`ts`（RFC 3339），而不是 AG-UI 的 `threadId` / `runId` 与整数 `timestamp`。理由：续传和去重依赖每条消息内的 `seq`（D6）；整个协议只用一种时间编码（D35）。
+3. **用 `stepId` 配对，另设 `label`**：AG-UI 只有 `stepName`，它同时是标识和名字，开始与结束靠名字配对。ChatWeave 同一条消息里可能出现两个同名步骤（例如两次“查天气”），而名字是给人看的、群聊里还可能按接收者被替换（4.7 第 11 条），所以用稳定的 `stepId` 配对，`label` 单独给人看。
+4. **`step.finished` 带结果状态 `state` 和 `durationMs`**：AG-UI 的 `STEP_FINISHED` 只有名字，失败只能通过整个运行的 `RUN_ERROR` 表达。ChatWeave 要求“一步失败只显示在这一行、不影响其他步骤和回答”，还要显示“等你确认”和每一步的耗时，所以结果状态是一等字段（转换成 AG-UI 时放进 `metadata`）。
+5. **不下发工具调用事件**（`TOOL_CALL_*`）：工具名、参数和原始结果是宿主内部信息，可能含业务数据，也不是给用户看的；用户看到的是宿主写的 `label` 和可选的 `summary`。一个步骤对应零个、一个或多个工具调用，由宿主决定。接入只会发 AG-UI 事件的外部 Agent 时，适配器按宿主登记的“工具 → 标签”表把 `TOOL_CALL_START` 翻成 `step.started`、把 `TOOL_CALL_END` / `TOOL_CALL_RESULT` 翻成 `step.finished`，丢弃参数和结果；没登记的工具用宿主的笼统标签。
+6. **不下发推理事件**（`REASONING_*`）：模型的思考文字不展示，也不传输（4.7 第 7 条）。理由：它是未经校验的模型原文，可能复述敏感数据或让用户误以为是结论；对“它做了什么”的理解帮助不大。
+7. **步骤带 `seq`、进事件日志、进持久化消息**：AG-UI 不规定事件的持久化。ChatWeave 的步骤要在续传、快照、同步之后保持一致，并在消息结束后留下精简记录（`message.steps`）。
+8. **没有子 Agent 归属**（AG-UI 的 `subagentRunId`）：v1 的步骤只有一层。
+
+同理，Phase 3 中“确认后在同一轮里交回 Agent 继续”的交互，`ActionSpec` 可以带一个不透明的 `toolCallId`，dispatcher 把用户的回答作为那次工具调用的结果交回宿主的 Agent 运行时，形状上对齐 AG-UI 的中断（`RUN_FINISHED.outcome.interrupt`）模式。0.1 不包含这个字段：v1 里用户回答之后的继续执行是新的一轮（4.7 第 8 条）。
 
 ## 11. 外部 Agent 的兼容
 
