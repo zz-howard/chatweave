@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/zz-howard/chatweave/schemas/v0.1/stream-event.schema.json",
   "title": "ChatWeave Stream Event (draft 0.1)",
-  "description": "DRAFT. One event of a per-message block stream. Transport-neutral; the SSE binding puts seq in the SSE 'id' field and the JSON below in 'data'. (messageId, seq) is unique: consumers drop events with seq <= last applied seq and reconnect on gaps. Consumers ignore unknown event types (but still advance seq).",
+  "description": "DRAFT. One event of a per-message block stream. Transport-neutral; the SSE binding puts seq in the SSE 'id' field and the JSON below in 'data'. (messageId, seq) is unique: consumers drop events with seq <= last applied seq and reconnect on gaps. Consumers ignore unknown event types (but still advance seq). Exception: message.activity is a transient, display-only event without seq; it is never logged, replayed, folded or persisted, and its SSE frame has no 'id' line.",
   "type": "object",
-  "required": ["protocolVersion", "type", "messageId", "seq"],
+  "required": ["protocolVersion", "type", "messageId"],
   "properties": {
     "protocolVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
     "type": {
@@ -18,12 +18,13 @@
         "block.end",
         "message.end",
         "message.snapshot",
+        "message.activity",
         "error"
       ]
     },
     "messageId": { "$ref": "action.schema.json#/$defs/messageId" },
     "seq": {
-      "description": "Starts at 1 for each message, increments by exactly 1 per event.",
+      "description": "Starts at 1 for each message, increments by exactly 1 per event. Required on every event except the transient message.activity, which must not carry it.",
       "type": "integer",
       "minimum": 1
     },
@@ -38,7 +39,8 @@
     { "$ref": "#/$defs/blockEnd" },
     { "$ref": "#/$defs/messageEnd" },
     { "$ref": "#/$defs/messageSnapshot" },
-    { "$ref": "#/$defs/streamError" }
+    { "$ref": "#/$defs/streamError" },
+    { "$ref": "#/$defs/messageActivity" }
   ],
   "$defs": {
     "envelope": {
@@ -77,7 +79,7 @@
 
     "messageStart": {
       "allOf": [{ "$ref": "#/$defs/envelope" }],
-      "required": ["message"],
+      "required": ["seq", "message"],
       "unevaluatedProperties": false,
       "properties": {
         "type": { "const": "message.start" },
@@ -98,7 +100,7 @@
     "blockStart": {
       "description": "Creates the block container (placeholder) at a fixed position. Its type never changes afterwards, which keeps layout stable.",
       "allOf": [{ "$ref": "#/$defs/envelope" }],
-      "required": ["blockId", "index", "blockType", "schemaVersion"],
+      "required": ["seq", "blockId", "index", "blockType", "schemaVersion"],
       "unevaluatedProperties": false,
       "properties": {
         "type": { "const": "block.start" },
@@ -126,7 +128,7 @@
     "blockDelta": {
       "description": "v1: only for markdown blocks; appends text. Component blocks never receive deltas in v1.",
       "allOf": [{ "$ref": "#/$defs/envelope" }],
-      "required": ["blockId", "delta"],
+      "required": ["seq", "blockId", "delta"],
       "unevaluatedProperties": false,
       "properties": {
         "type": { "const": "block.delta" },
@@ -144,7 +146,7 @@
     "blockData": {
       "description": "Delivers the complete data of a component block (whole, already validated server-side). Sent once per block in v1.",
       "allOf": [{ "$ref": "#/$defs/envelope" }],
-      "required": ["blockId", "data", "fallbackText"],
+      "required": ["seq", "blockId", "data", "fallbackText"],
       "unevaluatedProperties": false,
       "properties": {
         "type": { "const": "block.data" },
@@ -157,7 +159,7 @@
     "blockPatch": {
       "description": "JSON Merge Patch (RFC 7396) on the block's {data, fallbackText, metadata}. Arrays are replaced wholesale. 'rev' is present only for changes after the message was completed.",
       "allOf": [{ "$ref": "#/$defs/envelope" }],
-      "required": ["blockId", "patch"],
+      "required": ["seq", "blockId", "patch"],
       "unevaluatedProperties": false,
       "properties": {
         "type": { "const": "block.patch" },
@@ -176,7 +178,7 @@
     },
     "blockEnd": {
       "allOf": [{ "$ref": "#/$defs/envelope" }],
-      "required": ["blockId", "status"],
+      "required": ["seq", "blockId", "status"],
       "unevaluatedProperties": false,
       "properties": {
         "type": { "const": "block.end" },
@@ -192,7 +194,7 @@
     },
     "messageEnd": {
       "allOf": [{ "$ref": "#/$defs/envelope" }],
-      "required": ["status", "fallbackText", "blockCount", "rev"],
+      "required": ["seq", "status", "fallbackText", "blockCount", "rev"],
       "unevaluatedProperties": false,
       "properties": {
         "type": { "const": "message.end" },
@@ -211,7 +213,7 @@
     "messageSnapshot": {
       "description": "Full message state. Sent on resume when the requested seq can no longer be replayed, or by servers that do not keep an event log. Replaces the consumer's local state for this message.",
       "allOf": [{ "$ref": "#/$defs/envelope" }],
-      "required": ["message"],
+      "required": ["seq", "message"],
       "unevaluatedProperties": false,
       "properties": {
         "type": { "const": "message.snapshot" },
@@ -221,12 +223,40 @@
     "streamError": {
       "description": "Stream-level error. If the message itself failed, a message.end with status 'error' follows; transport-level errors (e.g. resume_unavailable, unauthorized) close the stream.",
       "allOf": [{ "$ref": "#/$defs/envelope" }],
-      "required": ["error"],
+      "required": ["seq", "error"],
       "unevaluatedProperties": false,
       "properties": {
         "type": { "const": "error" },
         "blockId": { "$ref": "#/$defs/blockId" },
         "error": { "$ref": "#/$defs/error" }
+      }
+    },
+    "messageActivity": {
+      "description": "Transient progress hint for display only (e.g. 'checking the weather...'). Carries NO seq: it is not written to the event log, not replayed on resume, not folded into the message and not included in snapshots, so fold(events) == persisted message still holds. Sent only to clients that declared the 'stream.activity' feature. Clients keep only the latest hint per message and clear it on the next sequenced event, a newer hint, or message.end.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "required": ["activity"],
+      "not": { "required": ["seq"] },
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "const": "message.activity" },
+        "activity": {
+          "type": "object",
+          "required": ["phase"],
+          "additionalProperties": false,
+          "properties": {
+            "phase": {
+              "description": "waiting: accepted, nothing produced yet. working: doing something (see label). still_working: no new content for a while. degraded: upstream slow or provider switched.",
+              "type": "string",
+              "enum": ["waiting", "working", "still_working", "degraded"]
+            },
+            "label": {
+              "description": "Host-authored, user-facing hint. Never model output, never business data, tool arguments or results.",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        }
       }
     }
   }

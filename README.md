@@ -4,6 +4,8 @@
 
 ChatWeave 是一个 **Markdown 优先的混合式生成 UI 聊天库**：回答默认仍是边生成边显示的 Markdown；信息确实适合结构化展示时，Agent 输出经过校验的**语义块**，客户端用原生组件画出来，文字和组件在同一条消息里自然交错。
 
+**适用场景**：一对一（一位用户和 AI 对话）与群聊（多位成员和 AI 在同一个会话里）都支持。协议和客户端规则在两种场景下相同；只在群聊里才会出现的问题（多人同时回答同一张卡、块级可见性）在文档里单独标明。
+
 ## 当前状态
 
 **设计阶段（草案），还没有代码。** 本仓库目前只有设计文档和 JSON Schema 草案（协议 0.1）。
@@ -20,10 +22,10 @@ ChatWeave 的取舍：**让 Agent 决定表达什么，让渲染器决定通常�
 
 - **Markdown 优先**：普通段落、解释、结论保持 Markdown；结构化只在需要时出现。
 - **10 种语义块**：`markdown`、`metric`、`metric_group`、`dataset`、`time_series`、`comparison`、`status`、`choice`、`confirmation`、`form_intent`，外加宿主自定义类型（`x-<host>.<name>`）。
-- **流式**：文字逐步出现；组件先占位、数据到达时整块填满；稳定块 ID、按 ID 补丁、幂等事件、断线续传（SSE + `Last-Event-ID`）、快照回退；持久化版本优先。
+- **流式**：文字逐步出现；组件先占位、数据到达时整块填满；稳定块 ID、按 ID 补丁、幂等事件、断线续传（SSE + `Last-Event-ID`）、快照回退；持久化版本优先；显式“停止生成”（与断线严格区分）、只用于显示的临时进度提示、按会话找回正在生成的消息。
 - **安全**：组件白名单、Schema 校验、数量与大小限制、Markdown 安全子集（不渲染 HTML、不加载图片）；UI 动作必须经服务端注册表校验和宿主权限检查，破坏性操作需要确认。
-- **交互结果以服务端为准**：选项、确认卡点按后只显示“提交中”，服务端记录后才显示结果；多人同时回答时先答者胜，所有设备显示同一个结果；幂等键在重试间保持不变。
-- **稳健的客户端状态**：单一写入口、结构共享、按块错误隔离、续传有明确的触发时机和上限、乐观用户消息按客户端 ID 对账；附带只读调试面板和宿主实现一致性测试。
+- **交互结果以服务端为准**：选项、确认卡点按后只显示“提交中”，服务端记录后才显示结果——即使是一对一，服务端也可能拒绝（权限、记录已变化或删除、校验不通过），同一用户也可能在两台设备上操作；群聊里多人同时回答时先答者胜，所有设备显示同一个结果；幂等键在重试间保持不变。
+- **稳健的客户端状态**：单一写入口、结构共享、按块错误隔离、续传有明确的触发时机和上限、用户消息 ID 由客户端生成（兼作离线重发的幂等键），乐观副本按同一个 ID 对账；附带只读调试面板和宿主实现一致性测试。
 - **与宿主解耦**：存储、传输、权限、主题全部由宿主注入；库不包含任何业务概念。
 - **与模型无关**：不依赖特定模型或 Agent 框架；只会输出文本的 Agent 自动降级为 Markdown。
 - **形状对齐 A2UI**：不依赖 A2UI，但字段形状对齐，将来可以加适配器。
@@ -99,7 +101,7 @@ ChatWeaveTheme(
 ```
 README.md
 LICENSE                      MIT
-schemas/v0.1/                JSON Schema（draft 2020-12）：content-block / message / stream-event / action / capabilities
+schemas/v0.1/                JSON Schema（draft 2020-12）：content-block / message / stream-event / action / capabilities / generation
 fixtures/conformance/        一致性夹具（事件流 → 期望消息），Rust 与 Dart 共用（规划）
 rust/crates/                 chatweave-protocol、chatweave-server（规划）
 dart/packages/               chatweave_core（纯 Dart）、chatweave_flutter（规划）

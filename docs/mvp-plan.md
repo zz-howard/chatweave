@@ -10,9 +10,11 @@
 2. 在第 N 个事件时切断网络，恢复后自动续传，最终界面与一次性收完完全一致（golden 相同）。
 3. 事件日志被清空后续传，收到快照，结果仍一致。
 4. 把客户端注册表换成 Markdown-only，消息仍完整可读。
-5. 点一个选项块的选项：点按后只显示“提交中”，服务端校验并更新块状态后才显示结果；另一台模拟设备同步后看到同一个“已回答”；重复提交同一动作只执行一次。两台设备几乎同时选了不同选项：只有一个被记录，后到的一方显示服务端记录的那个答案（含回答者），而不是自己点的。
+5. 点一个选项块的选项：点按后只显示“提交中”，服务端校验并更新块状态后才显示结果；另一台模拟设备同步后看到同一个“已回答”；重复提交同一动作只执行一次。两台设备几乎同时选了不同选项（一对一：同一用户的两台设备；群聊：两位成员）：只有一个被记录，后到的一方显示服务端记录的那个答案（群聊里含回答者），而不是自己点的。服务端作废一张确认卡时显示“已作废”和原因，与用户自己点“取消”的显示不同。
 6. 删除待办需要破坏性确认块；直接伪造一个指向删除处理器的 `choice.select` 请求被拒绝。
 7. 不提供 `ActionTransport` 时，交互块以只读方式显示，点按不会发出任何消息或请求。
+8. 生成中按“停止”：消息以“已停止”结束，已出现的内容保留；在停止请求之后、`message.end` 之前切断网络，恢复后客户端**不**重新订阅这条消息，而是拿到持久化版本。只切后台或断网（没按停止）时生成继续，恢复后续传。
+9. 提交用户消息后、收到助手消息 ID 之前杀掉 App：重启后通过“重新提交同一个用户消息 ID”或“查询活动消息”接回同一条助手消息，不产生第二次生成；假 Agent 发出的临时进度提示能显示，但不出现在最终消息里。重启服务端后续传得到快照，结果仍一致。
 
 ## 1. 任务列表
 
@@ -40,7 +42,7 @@ T0 ─┬─ T1 ─┬─ T2 ─┬─ T3 ─┐
 - **目标**：把 [protocol.md](protocol.md) 与 `schemas/v0.1/` 定稿为 0.1，产出两端共用的一致性夹具。
 - **主要模块**：`docs/protocol.md`、`schemas/v0.1/`、`fixtures/conformance/`。
 - **依赖**：T0。
-- **产物**：每个内置类型的正例 / 反例；至少 12 个事件流夹具（`*.events.jsonl` + `*.expected.json`），覆盖：纯文本、混排、占位后填充、块失败、中断、重复事件、跳号、快照、补丁与 `rev`、未知块类型、未知事件类型、超限；另有动作夹具：正常回答、先答者胜（后到者拿到 `already_resolved` + 当前状态）、过期、被取代。
+- **产物**：每个内置类型的正例 / 反例；至少 12 个事件流夹具（`*.events.jsonl` + `*.expected.json`），覆盖：纯文本、混排、占位后填充、块失败、中断、用户停止、重复事件、跳号、快照、补丁与 `rev`、未知块类型、未知事件类型、穿插临时进度事件（折叠结果与不含它们时相同）、超限；另有动作夹具：正常回答、先答者胜（后到者拿到 `already_resolved` + 当前状态）、过期、被取代、服务端作废（`cancelled` + `reason`）；生成控制夹具：开始（重复提交返回同一个助手消息 ID）、停止、活动消息查询。
 - **验收**：`tool/validate_schemas` 通过（正例全部通过 Schema、反例全部被拒）；夹具的期望消息全部通过 `message.schema.json`。
 
 ### T2 Rust：`chatweave-protocol`
@@ -56,8 +58,8 @@ T0 ─┬─ T1 ─┬─ T2 ─┬─ T3 ─┐
 - **目标**：服务端产生合规事件流、可续传。
 - **主要模块**：`chatweave-server`（`MessageStream`、`EventLog`、`sse_response`，feature `axum`）。
 - **依赖**：T2。
-- **产物**：生成器（分配 seq / 块 ID / index，合并 delta，块失败与中断处理，`fallbackText` 辅助）；`EventLog` 接口 + 内存实现；Axum SSE 辅助（`Last-Event-ID` / `?after=`、心跳、快照回退、`resume_unavailable`）；崩溃恢复辅助（折叠日志 → interrupted）。
-- **验收**：生成器的输出逐条通过 Schema；`axum-test` 集成测试：中途断开后带 `Last-Event-ID` 重连，拼接结果与不断开一致；日志清空后得到快照；慢订阅者被断开不影响生成。
+- **产物**：生成器（分配 seq / 块 ID / index，合并 delta，块失败与中断处理，`fallbackText` 辅助）；`EventLog` 接口 + 默认的进程内环形缓冲实现（按消息、按 `seq`，保留期满释放）+ 检查点辅助；Axum SSE 辅助（`Last-Event-ID` / `?after=`、心跳、快照回退、`resume_unavailable`、`ChatWeave-Protocol` 响应头、`message.activity` 帧不带 `id:`）；停止与活动消息查询的处理函数（比对后清理活动登记）；崩溃恢复辅助（折叠日志或从检查点恢复 → interrupted）。
+- **验收**：生成器的输出逐条通过 Schema；`axum-test` 集成测试：中途断开后带 `Last-Event-ID` 重连，拼接结果与不断开一致；日志清空（或模拟进程重启、缓冲为空）后得到快照；慢订阅者被断开不影响生成；客户端断开连接后生成继续，只有停止请求会结束生成；重复停止返回同样结果；临时进度事件不进入日志和折叠结果。
 
 ### T4 Rust：Action Registry 与 dispatcher
 
@@ -72,7 +74,7 @@ T0 ─┬─ T1 ─┬─ T2 ─┬─ T3 ─┐
 - **目标**：客户端协议核心，纯 Dart。
 - **主要模块**：`dart/packages/chatweave_core`。
 - **依赖**：T1。
-- **产物**：模型类（手写序列化）；`SseDecoder`；`EventParser`；`BlockStore`（单一写入口 `apply`、结构共享、seq 去重、按块合并、Merge Patch、`rev` 规则、持久化版本对账、`clientMessageId` 对账）；`StreamController`（续传状态机、触发时机、单飞、轮数上限、退避、心跳超时）；`InteractionController`；`ViewportController`（纯函数）；`inspect()` 只读快照与事件环形缓冲；`ChatWeaveStore` / `StreamTransport` / `ActionTransport` 接口与内存实现、`ScriptedTransport`；宿主实现一致性套件；`Limits`。
+- **产物**：模型类（手写序列化）；`SseDecoder`；`EventParser`；`BlockStore`（单一写入口 `apply`、结构共享、seq 去重、按块合并、Merge Patch、`rev` 规则、持久化版本对账、乐观用户消息按 `id` 对账）；`StreamController`（续传状态机、触发时机、单飞、轮数上限、退避、心跳超时、“已请求停止”不自动重连、临时进度提示、活动消息查询）；`InteractionController`；`ViewportController`（纯函数）；`inspect()` 只读快照与事件环形缓冲；`ChatWeaveStore` / `StreamTransport` / `ActionTransport` 接口与内存实现、`ScriptedTransport`；宿主实现一致性套件；`Limits`。
 - **验收**：同一批一致性夹具全部通过（与 Rust 的 `fold` 结果一致）；SSE 解码对任意切分的字节流（逐字节、跨帧切分）结果相同；续传状态机的属性测试（随机插入重复、断线）最终状态等于期望消息；重复事件不触发通知且返回同一对象；同一消息的多个续传触发只产生一次连接；`ViewportController` 的单元测试（插入历史、组件变高时锚点不动）；内存实现通过一致性套件，故意写坏的实现被套件发现；`pubspec.yaml` 不含 Flutter，源码不导入 `dart:io`。
 
 ### T6 Flutter：主题接口、Markdown、注册表与降级
@@ -104,7 +106,7 @@ T0 ─┬─ T1 ─┬─ T2 ─┬─ T3 ─┐
 - **目标**：交互块的客户端流程。
 - **主要模块**：`chatweave_core`（`ActionRequest` 构造、`InteractionController`）、`chatweave_flutter`（交互组件接线）。
 - **依赖**：T5、T7。
-- **产物**：“提交中”与“已排队（离线）”显示状态（不乐观显示结果）、收到补丁后显示服务端结果（含别人先答的情况）、`followUp` 自动订阅、错误显示（含 `fieldErrors`）、`unavailable` / 超时的“正在确认”状态与同 ID 重试、无 `ActionTransport` 时只读。
+- **产物**：“提交中”与“已排队（离线）”显示状态（不乐观显示结果）、收到补丁后显示服务端结果（含另一台设备或群聊里别人先答的情况）、`cancelled` 带原因的显示、`followUp` 自动订阅、错误显示（含 `fieldErrors`）、`unavailable` / 超时的“正在确认”状态与同 ID 重试、无 `ActionTransport` 时只读。
 - **验收**：重复点击只生成一个动作 ID；网络错误后重试复用同一 ID；提交中界面上没有任何选项被标为已选；服务端拒绝时回到可操作状态并显示原因；`already_resolved` 时显示补丁里的答案而不是本地点击；补丁重复应用无副作用；组件被回收重建后提交中状态与幂等键不变。
 
 ### T10 示例 App 与端到端测试
@@ -113,7 +115,7 @@ T0 ─┬─ T1 ─┬─ T2 ─┬─ T3 ─┐
 - **主要模块**：`examples/assist_demo/server`（Axum + 脚本化假 Agent + 内存存储）、`examples/assist_demo/app`（Flutter）。
 - **依赖**：T3、T4、T8、T9。
 - **产物**：天气 + 待办领域；自定义类型 `x-todo.task_card` 演示宿主组件注册；断网模拟开关。
-- **验收**：第 0 节的七条端到端场景全部自动化通过（集成测试 + golden）。
+- **验收**：第 0 节的九条端到端场景全部自动化通过（集成测试 + golden）。
 
 ### T11 首个宿主集成（在宿主仓库进行，不在本仓库）
 
@@ -133,5 +135,5 @@ T0 ─┬─ T1 ─┬─ T2 ─┬─ T3 ─┐
 | R5 | Dart 端缺少成熟的 JSON Schema 2020-12 校验器 | 客户端不跑 Schema，只做类型化解析 + 限制检查；Schema 一致性由夹具保证 | 评估 `json_schema` 包，仅在测试中使用 |
 | R6 | Rust 与 Dart 两套实现漂移 | 共用一致性夹具，两端 CI 都跑 | 从 Schema 生成两端类型（`typify` / 自写生成器），代价是生成代码可读性差 |
 | R7 | 模型的工具调用参数分片到达 | 服务端缓冲到工具调用完整再执行并发 `block.data`（与“组件整块到达”一致） | — |
-| R8 | 事件日志写入量（每个 delta 一行） | 合并 delta（约 20 字 / 50ms 一批）；日志保留期短 | 只在内存保留日志 + 进程重启后只能快照（需客户端支持 `stream.snapshot`） |
+| R8 | 事件日志写入量（每个 delta 一行） | 默认进程内缓冲 + 检查点，重启后只给快照（D42）；合并 delta（约 20 字 / 50ms 一批）；日志保留期短 | 多实例或要求重启后逐事件续传时，换成持久日志（例如 PostgreSQL） |
 | R9 | A2UI 将来成为事实标准，迁移成本 | 字段形状对齐 + 映射表 | Phase 2 评估适配器；或在块内嵌 A2UI surface 作为一种自定义类型 |

@@ -29,6 +29,7 @@
         "enum": [
           "stream.resume",
           "stream.snapshot",
+          "stream.activity",
           "action.choice",
           "action.confirmation",
           "action.form",

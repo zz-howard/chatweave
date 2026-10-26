@@ -84,7 +84,7 @@
       "pattern": "^[a-z][a-z0-9_]{0,31}$"
     },
     "blockType": {
-      "description": "Built-in semantic type, or a host-defined custom type namespaced as x-<host>.<name>, e.g. x-jiabu.record_card.",
+      "description": "Built-in semantic type, or a host-defined custom type namespaced as x-<host>.<name>, e.g. x-jiabu.record_card. Custom record-like types should carry the record id plus an optional display-only title snapshot (shown only when the record cannot be read locally); the id is the source of truth.",
       "anyOf": [
         {
           "type": "string",
@@ -184,13 +184,13 @@
       }
     },
     "blockState": {
-      "description": "Server-authored state of an interactive block, updated via block.patch only after the server has recorded the outcome. Clients never write it optimistically: the transient 'submitting' / 'queued' display states are client-local and never appear in the protocol. When several people can answer the same block, the first recorded answer wins and every client shows that server outcome.",
+      "description": "Server-authored state of an interactive block, updated via block.patch only after the server has recorded the outcome. Clients never write it optimistically: the transient 'submitting' / 'queued' display states are client-local and never appear in the protocol. Applies to every scenario: even in a 1:1 chat the server may reject an action (permission, the referenced record changed or was deleted, validation) and the same user may act from two devices. The first recorded answer wins (in group chats several members may answer the same block concurrently) and every client shows that server outcome.",
       "type": "object",
       "required": ["status"],
       "additionalProperties": false,
       "properties": {
         "status": {
-          "description": "open: accepts actions. resolved: an answer was recorded (see selected / outcome / values / freeText, resolvedBy, resolvedAt). expired: expiresAt passed without an answer. cancelled: withdrawn by the server. superseded: replaced by a newer interactive block (e.g. a fresh confirmation for the same operation).",
+          "description": "open: accepts actions. resolved: an answer was recorded (see selected / outcome / values / freeText, resolvedBy, resolvedAt). expired: expiresAt passed without an answer. cancelled: invalidated by the server; 'reason' is required (a user tapping cancel on a confirmation is 'resolved' with outcome 'cancel', not this). superseded: replaced by a newer interactive block (e.g. a fresh confirmation for the same operation).",
           "type": "string",
           "enum": ["open", "resolved", "expired", "cancelled", "superseded"]
         },
@@ -207,7 +207,7 @@
         "outcome": { "type": "string", "enum": ["confirm", "cancel"] },
         "values": { "type": "object", "maxProperties": 12 },
         "resolvedBy": {
-          "description": "Opaque host identifier of whoever's answer was recorded (e.g. a member id). The library never interprets it; the host resolves it to a display name.",
+          "description": "Opaque host identifier of the user whose answer was recorded (e.g. a member id), including a user who chose 'cancel' on a confirmation. Only for status 'resolved'; server-caused endings (cancelled / expired / superseded) never carry it. May be omitted in 1:1 chats. The library never interprets it; the host resolves it to a display name.",
           "type": "string",
           "minLength": 1,
           "maxLength": 128
@@ -218,12 +218,41 @@
           "type": "string",
           "maxLength": 200
         },
+        "reason": {
+          "description": "Why the server ended the block without a user answer. Required for 'cancelled', optional for 'expired' / 'superseded', absent for 'open' / 'resolved'. Lets the UI tell 'you cancelled' apart from 'the system invalidated this'.",
+          "type": "object",
+          "required": ["code"],
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": ["withdrawn", "policy", "record_changed", "record_deleted", "permission_changed", "other"]
+            },
+            "text": {
+              "description": "Short user-facing explanation. No internal details.",
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        },
         "note": { "$ref": "#/$defs/text" }
       },
       "allOf": [
         {
           "if": { "properties": { "status": { "const": "resolved" } }, "required": ["status"] },
           "then": { "required": ["resolvedAt"] }
+        },
+        {
+          "if": { "properties": { "status": { "const": "cancelled" } }, "required": ["status"] },
+          "then": { "required": ["reason"] }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["cancelled", "expired", "superseded"] } }, "required": ["status"] },
+          "then": { "not": { "required": ["resolvedBy"] } }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["open", "resolved"] } }, "required": ["status"] },
+          "then": { "not": { "required": ["reason"] } }
         }
       ]
     },

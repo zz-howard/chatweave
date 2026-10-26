@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zz-howard/chatweave/schemas/v0.1/generation.schema.json",
+  "title": "ChatWeave Generation Control (draft 0.1)",
+  "description": "DRAFT. Responses of the generation-control endpoints (paths chosen by the host, see docs/protocol.md 4.6): starting a generation returns the assistant message id synchronously; stopping is an explicit, idempotent request distinct from disconnecting; a per-conversation query lists messages still being generated so a client killed before it learned the id can re-attach. These are not block actions and do not use the Action protocol.",
+  "$defs": {
+    "startResponse": {
+      "description": "Returned by the host's submit-user-message endpoint BEFORE generation produces output. Resubmitting the same user message id returns the same assistant messageId with replayed=true and never starts a second generation.",
+      "type": "object",
+      "required": [
+        "userMessageId",
+        "messageId"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "userMessageId": {
+          "description": "Client-generated id of the user message (idempotency key).",
+          "$ref": "action.schema.json#/$defs/actionId"
+        },
+        "messageId": {
+          "description": "Server-generated id of the assistant reply.",
+          "$ref": "action.schema.json#/$defs/messageId"
+        },
+        "streamable": {
+          "type": "boolean",
+          "default": true
+        },
+        "replayed": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "stopResponse": {
+      "description": "Result of POST .../messages/{messageId}/stop. stopping: generation is being cancelled; a message.end with status interrupted and error code cancelled follows. already_ended: nothing to stop; use the persisted message.",
+      "type": "object",
+      "required": [
+        "messageId",
+        "status"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "messageId": {
+          "$ref": "action.schema.json#/$defs/messageId"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "stopping",
+            "already_ended"
+          ]
+        }
+      }
+    },
+    "activeMessagesResponse": {
+      "description": "Result of GET .../conversations/{conversationId}/active-messages. Empty list when nothing is generating. A list because a group conversation may have several generations at once.",
+      "type": "object",
+      "required": [
+        "messages"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "conversationId": {
+          "$ref": "action.schema.json#/$defs/messageId"
+        },
+        "messages": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "required": [
+              "messageId",
+              "lastSeq"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "messageId": {
+                "$ref": "action.schema.json#/$defs/messageId"
+              },
+              "lastSeq": {
+                "description": "Last seq emitted so far (0 if none yet).",
+                "type": "integer",
+                "minimum": 0
+              },
+              "replyTo": {
+                "description": "Id of the user message this generation answers, so a client can match its pending user message.",
+                "$ref": "action.schema.json#/$defs/messageId"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/startResponse"
+    },
+    {
+      "$ref": "#/$defs/stopResponse"
+    },
+    {
+      "$ref": "#/$defs/activeMessagesResponse"
+    }
+  ]
+}
