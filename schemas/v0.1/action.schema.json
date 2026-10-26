@@ -70,7 +70,7 @@
       }
     },
     "choiceSelectPayload": {
-      "description": "Exactly one of: selected (option ids from the block) or freeText. freeText is accepted only for the block of an open interrupt that declares allowFreeText (docs/protocol.md 4.8): the typed answer is the interrupt's result, not a chat message. For a choice in a message that has ended, a free-text answer is still a normal user message (D22).",
+      "description": "Exactly one of: selected (option ids from the block) or freeText. freeText is accepted only for the block of an open interrupt whose otherInput is not false (docs/protocol.md 4.8, D60): the typed answer is the interrupt's result, not a chat message. For a choice in a message that has ended, a free-text answer is still a normal user message (D22).",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -81,23 +81,33 @@
           "maxItems": 10,
           "uniqueItems": true
         },
-        "freeText": { "type": "string", "minLength": 1, "maxLength": 500 }
+        "freeText": { "$ref": "#/$defs/freeText" }
       },
       "oneOf": [ { "required": ["selected"] }, { "required": ["freeText"] } ]
     },
+    "freeText": {
+      "description": "A free-text answer to an open interrupt, typed after the user chose the card's 'other input' entry (D60). Passed to the host's agent as the interrupt's result, uninterpreted. The dispatcher accepts it only for the block of an open interrupt whose otherInput is not false; otherwise invalid_payload.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
     "confirmationRespondPayload": {
+      "description": "Exactly one of: outcome, or freeText (only for the block of an open interrupt whose otherInput is not false, D60).",
       "type": "object",
-      "required": ["outcome"],
       "additionalProperties": false,
       "properties": {
-        "outcome": { "type": "string", "enum": ["confirm", "cancel"] }
-      }
+        "outcome": { "type": "string", "enum": ["confirm", "cancel"] },
+        "freeText": { "$ref": "#/$defs/freeText" }
+      },
+      "oneOf": [ { "required": ["outcome"] }, { "required": ["freeText"] } ]
     },
     "formSubmitPayload": {
+      "description": "Exactly one of: values, or freeText (only for the block of an open interrupt whose otherInput is not false, D60).",
       "type": "object",
-      "required": ["values"],
       "additionalProperties": false,
+      "oneOf": [ { "required": ["values"] }, { "required": ["freeText"] } ],
       "properties": {
+        "freeText": { "$ref": "#/$defs/freeText" },
         "values": {
           "type": "object",
           "maxProperties": 12,

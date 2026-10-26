@@ -149,6 +149,11 @@
           "description": "AG-UI 1.0 core reason values: 'confirmation' (approve or decline an operation, e.g. a confirmation block before a tool runs) or 'input_required' (the agent needs an answer, e.g. a choice or form_intent block from an ask_user tool).",
           "type": "string",
           "enum": ["confirmation", "input_required"]
+        },
+        "otherInput": {
+          "description": "Whether the interrupt's card offers the fixed 'other input' entry besides its own controls (docs/protocol.md 4.8, D60): the user may answer with free text instead ({freeText} on the block's action), which the host's agent interprets. Default true; a host may turn it off per interrupt (e.g. a pure confirm / cancel). Not part of AG-UI; carried in Interrupt.metadata when converting.",
+          "type": "boolean",
+          "default": true
         }
       }
     },

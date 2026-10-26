@@ -210,10 +210,10 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 ```
 2–10 个选项。`state` 由服务端维护：服务端记录答案后经 `block.patch` 变成 `{"status":"resolved","selected":["bj"],"resolvedBy":"member_7","resolvedAt":"2026-10-26T09:31:11Z"}`，所有设备都会看到同一个“已回答”结果（交互块状态的完整规则见 3.4）。
 
-`allowFreeText: true` 表示除了点选项，用户也可以**直接用文字回答**。文字回答怎么提交，看这个块属于哪种“问”（4.8）：
+文字回答分两种“问”（4.8）：
 
-- 块是**中断**的提问（消息 `paused`，`interrupt.blockId` 指向它）：文字回答是这个中断的结果，**不是**一条聊天消息，经动作通道提交 `choice.select {freeText}`，显示在卡片上（[D55](decisions.md)）。
-- 块在一条**已经结束**的消息里（最终回答里附带的问题）：文字回答作为一条**普通用户消息**发出，不走动作通道；宿主把它关联到这个仍为 `open` 的块，并在服务端把块写成 `resolved`（`freeText` 记录回答文本）（[D22](decisions.md)）。
+- 块是**中断**的提问（消息 `paused`，`interrupt.blockId` 指向它）：不看 `allowFreeText`。每张中断卡（`choice`、`confirmation`、`form_intent` 都一样）默认固定带一个“其他内容”入口，由中断的 `otherInput` 控制（默认 `true`，宿主可以对单个中断关掉）。用户点它、在输入框里写的文字是这个中断的结果，**不是**一条聊天消息，经动作通道提交 `{freeText}`，显示在卡片上（[D60](decisions.md)）。
+- 块在一条**已经结束**的消息里（最终回答里附带的问题）：`allowFreeText: true` 表示用户也可以直接发一条消息来回答。文字回答作为一条**普通用户消息**发出，不走动作通道；宿主把它关联到这个仍为 `open` 的块，并在服务端把块写成 `resolved`（`freeText` 记录回答文本）（[D22](decisions.md)）。
 
 两种情况下块的 `state.freeText` 都记录回答文本。
 
@@ -351,7 +351,11 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 
 这三件事不是块上的动作，不走 Action 协议；端点路径由宿主决定，库提供处理函数与 Schema（[`generation.schema.json`](../schemas/v0.1/generation.schema.json)）。流式细节见 [streaming.md 第 4 节](streaming.md#4-断线续传)。
 
-1. **开始：同步返回助手消息 ID**（[D41](decisions.md)）。宿主的“提交用户消息”接口**必须**在生成开始前返回 `{userMessageId, messageId, streamable}`（`messageId` 是这次回复的助手消息 ID）。同一个用户消息 ID 重复提交（例如离线重发、超时重试）返回同一个 `messageId`，`replayed: true`，不会开始第二次生成。
+1. **开始：同步返回助手消息 ID**（[D41](decisions.md)）。宿主的“提交用户消息”接口**必须**在生成开始前返回 `{userMessageId, messageId, streamable}`（`messageId` 是这次回复的助手消息 ID）。同一个用户消息 ID 重复提交（例如离线重发、超时重试）返回同一个 `messageId`，`replayed: true`，不会开始第二次生成。会话里有一个开着的中断时，宿主可以拒绝开始（4.8 第 16 条）：
+
+   ```json
+   {"userMessageId":"01J9ZA0B1C","error":{"code":"interrupt_pending","message":"先回答上面的问题。"},"pending":{"messageId":"msg_03","interruptId":"int_01"}}
+   ```
 2. **停止：显式请求，与断线严格区分**（[D39](decisions.md)）。`POST {宿主前缀}/messages/{messageId}/stop`，幂等。服务端取消生成，持久化已产出的部分，发 `message.end{status: "interrupted", error.code: "cancelled"}`；响应 `{messageId, status: "stopping" | "already_ended"}`。暂停中的消息同样可以停止（4.8）。**关闭连接、切后台、离开页面、App 被杀都只是断线**，不是停止，生成照常继续，之后可以续传。谁能停止由宿主授权（例如只允许发起这一轮的用户）。
 3. **找回：按会话查询正在生成的消息**（[D41](decisions.md)）。`GET {宿主前缀}/conversations/{conversationId}/active-messages` → `{conversationId, messages: [{messageId, lastSeq, replyTo?, status?}]}`，列出还没结束的消息（`status` 为 `streaming`（默认）或 `paused`），没有就返回空列表。用于“提交了用户消息、还没收到助手消息 ID 时 App 就被杀”的空窗：重启后先查一次，再按 `messageId` 续传。群聊里同一会话可能同时有几条在生成，所以是列表。
 
@@ -415,7 +419,7 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 ```
 streaming ──message.paused──▶ paused ──(回答) block.patch + message.resumed──▶ streaming ──…──▶ message.end（complete）
                                  │
-                                 ├─(停止 / 发了新消息) block.patch(cancelled, stopped) + step.finished(cancelled)… + message.end(interrupted, cancelled)
+                                 ├─(停止，或宿主按第 16 条先停止) block.patch(cancelled, stopped) + step.finished(cancelled)… + message.end(interrupted, cancelled)
                                  └─(过期) block.patch(expired) + step.finished(cancelled)… + message.end(interrupted, interrupt_expired)
 ```
 
@@ -429,7 +433,7 @@ streaming ──message.paused──▶ paused ──(回答) block.patch + mess
 ```
 
 1. **前提**：中断的交互块（`choice` / `confirmation` / `form_intent`，状态 `open`）已经完整发出（`block.data` + `block.end`）；所有已开始的块都已结束；除了中断的那一步和它上面的委派步骤（子 Agent 里发起的中断，见第 9 条），没有其他步骤在运行——并行的其他工具调用先跑完。
-2. `interrupt`：`id`（不透明，消息内唯一）、`stepId`（发起中断的那一步）、`blockId`（正文里的交互块，问题本身在块里）、`reason`（`confirmation` = 确认或拒绝一个操作；`input_required` = 需要用户回答。取值对齐 AG-UI 的核心 reason）。过期时间取块的 `action.expiresAt`，不在这里重复。
+2. `interrupt`：`id`（不透明，消息内唯一）、`stepId`（发起中断的那一步）、`blockId`（正文里的交互块，问题本身在块里）、`reason`（`confirmation` = 确认或拒绝一个操作；`input_required` = 需要用户回答。取值对齐 AG-UI 的核心 reason）、`otherInput`（可选，布尔，默认 `true`：这张卡除了自己的控件，是否固定提供“其他内容”入口，让用户改用一段文字回答，见第 10 条；宿主可以对单个中断关掉，例如只允许“确认 / 取消”的纯确认，这时用户只能在卡上作答或停止）。过期时间取块的 `action.expiresAt`，不在这里重复。
 3. **折叠**：消息 `status` 变成 `paused`，带上 `interrupt`；那一步变成 `awaiting_user` 并写入 `blockId`；`fallbackText` 是到目前为止的纯文本（含问题），给只会显示文本的客户端和通知用。
 4. **持久化**：服务端在发出 `message.paused` 的同时（同一事务或等价的条件写入）把暂停检查点写进消息存储：折叠后的消息（`status: paused`、`rev: 0`、`lastSeq` = 这个事件的 `seq`）。暂停可能持续几小时甚至几天，检查点是它的权威状态，**不依赖**事件日志或进程内缓冲；服务端重启不影响暂停中的消息。
 5. **关闭流**：发出 `message.paused` 后服务端关闭这条 SSE 连接（像 `message.end` 一样）。客户端进入“已暂停”状态，**不自动重连**——这时没有东西可等；打开会话、回到前台等续传触发时机（[streaming.md 4.3](streaming.md#43-客户端续传状态机)）对暂停中的消息不生效。
@@ -440,19 +444,21 @@ streaming ──message.paused──▶ paused ──(回答) block.patch + mess
 
 **回答与继续（`message.resumed`）**
 
-10. **回答就是中断的结果**：用户在中断的块上操作（选项、确认 / 取消、表单），客户端照常发动作请求（第 5 节，幂等键规则不变）。`choice` 的文字回答也走动作通道：`choice.select {freeText}`，只对中断的、`allowFreeText: true` 的块有效（3.2）。回答**不会**变成一条用户消息；它记在块的 `state` 里（`resolved`、`selected` / `outcome` / `values` / `freeText`），显示在卡片上和这一步上。用户在确认卡上点“取消”也是一个回答（`outcome: cancel`），运行照样继续，由 Agent 决定接下来怎么说。
+10. **回答就是中断的结果**：用户在中断的块上操作（选项、确认 / 取消、表单），客户端照常发动作请求（第 5 节，幂等键规则不变）。**文字回答**也走动作通道：中断开着且 `otherInput` 不为 `false` 时，三种交互块都接受 `{freeText}`（`choice.select`、`confirmation.respond`、`form.submit`，与块自身的答案字段二选一）。文字原样作为中断的结果交给宿主的 Agent 运行时（例如在确认卡上写“改成 72 块再删”），由 Agent 理解；库和宿主的处理器都不把它解析成某个选项（[D60](decisions.md)）。输入框怎么配合见 [rendering.md 4.5](rendering.md#45-输入框联动composer-契约)。回答**不会**变成一条用户消息；它记在块的 `state` 里（`resolved`、`selected` / `outcome` / `values` / `freeText`），显示在卡片上和这一步上。用户在确认卡上点“取消”也是一个回答（`outcome: cancel`），运行照样继续，由 Agent 决定接下来怎么说。
 11. **服务端**：dispatcher 按第 5.2 节校验；第 7 步对中断的块是：在同一个事务（或条件写入）里检查“消息仍是 `paused`、中断仍未回答、块仍是 `open`”→ 记录答案 → 把答案作为这次中断的结果交给宿主的 Agent 运行时（宿主把它当作那次工具调用的结果，例如 `ask_user` 的返回值或“已确认，可以执行”）。返回 `ActionResult{status: "accepted", resume: {messageId}}`，**不带** `patches`、不加 `rev`（消息还没结束）。
 12. **流里的顺序**：继续时服务端先发记录答案的 `block.patch`（块 → `resolved`，不带 `rev`），紧接着发 `message.resumed{interruptId}`；之后运行照常产出事件（那一步回到 `running`，最后 `step.finished`；新的块；`message.end`）。`message.resumed` **必须**紧跟在把中断的块写成 `resolved` 的 `block.patch` 之后。
 13. **客户端**：收到 `resume` 后按已应用的 `seq` 重新订阅这条消息（`Last-Event-ID = 已应用 seq`）；在收到 `block.patch` 之前，块照常只显示“提交中”（[D18](decisions.md)）。其他设备通过活动消息列表或下一次打开会话时订阅，拿到同样的事件。
 14. **幂等与并发**：同一个动作 ID 重复提交返回第一次的结果（含 `resume`），不会让运行继续两次。另一台设备已经回答过（或已停止、已过期）时，后到的请求被拒（`already_resolved` / `expired`）；如果消息还没结束，结果不带 `patches` 而带 `resume`，客户端订阅后从流（或快照）里看到真实结果；消息已经结束时照常带 `rev` 补丁。
 
-**暂停中停止、发新消息、过期**（[D56](decisions.md)）
+**暂停中停止、新消息、过期**（[D56](decisions.md)、[D61](decisions.md)、[D62](decisions.md)）
 
 15. **停止**：暂停中的消息可以停止（`POST …/stop`，幂等）。服务端在同一个条件写入里关闭中断，然后依次发：中断块的 `block.patch`（→ `cancelled`，`reason.code: "stopped"`）、等待中的那一步及其上面的委派步骤各一个 `step.finished{state: cancelled}`（先子后父）、`message.end{status: interrupted, error.code: cancelled}`，并持久化最终消息（`rev = 1`）。这些事件写进日志；没有人在订阅时，客户端下次打开时从持久化版本拿到结果。
-16. **不回答、直接发新消息**：中断还开着时，用户在输入框里发了新内容——
-    - 中断的块是允许文字回答的 `choice`：输入框的内容就是这个中断的文字回答（第 10 条），不是新消息。界面应在输入框上提示“回答上面的问题”。
-    - 其他情况：宿主的“提交用户消息”接口先对暂停中的消息执行第 15 条的停止（块 `cancelled` + `stopped`），然后照常开始新的一轮。这与 AG-UI“有未回答的中断时，新的输入必须先处理它们”一致。
-17. **过期**：块的 `action.expiresAt` 到了仍没回答，服务端关闭中断：块 → `expired`，步骤 → `cancelled`（同第 15 条的顺序），`message.end{status: interrupted, error.code: interrupt_expired}`。没有 `expiresAt` 的中断不会自己过期（直到停止或发新消息）。过期时间由宿主按场景设定。
+16. **暂停时输入框锁定；中断开着时到达的新消息**：中断还开着、当前用户可以回答时，客户端的输入框**锁定**，发不出普通消息（[rendering.md 4.5](rendering.md#45-输入框联动composer-契约)，[D61](decisions.md)）：要用文字回答就点卡上的“其他内容”，这时输入框发出的是这个中断的 `freeText`（第 10 条）；不想回答就停止（第 15 条）。所以正常界面上没有“不回答、直接发新消息”这条路。万一服务端在中断开着时仍收到这位用户在这段会话里的新消息（旧版本客户端、还不知道已经暂停的另一台设备、离线排队后补发的消息），宿主二选一，**绝不**把它默默当成回答（[D62](decisions.md)）：
+    - **拒绝**（推荐用于在线提交）：开始接口返回 `startRejected{error.code: "interrupt_pending", pending: {messageId, interruptId}}`（[`generation.schema.json`](../schemas/v0.1/generation.schema.json)），这条消息不保存、不开始生成；客户端据此显示那张卡、输入框进入锁定，草稿留在输入框里。
+    - **先停止再开始**（用于不能拒绝的提交，例如离线排队同步上来的消息）：先对暂停中的消息执行第 15 条的停止（块 `cancelled` + `stopped`），再照常开始新的一轮。
+    两种做法都与 AG-UI“有未回答的中断时，新的输入必须先处理它们”一致。群聊里只针对能回答这个中断的成员（其他成员照常聊天）；宿主也可以按自己的规则决定。
+
+17. **过期**：块的 `action.expiresAt` 到了仍没回答，服务端关闭中断：块 → `expired`，步骤 → `cancelled`（同第 15 条的顺序），`message.end{status: interrupted, error.code: interrupt_expired}`。没有 `expiresAt` 的中断不会自己过期（直到停止，或按第 16 条先停止）。过期时间由宿主按场景设定。
 18. **先到者胜**：回答、停止、过期、新消息都要先“检查中断仍开着 → 关闭它”，在同一个事务或条件写入里完成，只有一个会成功。停止请求到达时如果回答已经被接受、消息又在生成了，就按普通的停止处理。
 
 ## 5. Action 协议（v1 最小集合）
@@ -484,7 +490,7 @@ streaming ──message.paused──▶ paused ──(回答) block.patch + mess
      - 只有在服务端给出明确的拒绝（`rejected`）、块仍是 `open`、用户重新做了决定时，才生成新 ID。
      - 提交进行中再次点按不产生新请求（防双击）。
    - `context`：只有定位块所需的 ID。**用户是谁、属于哪个租户、有什么权限，一律由宿主在服务端推导，不信任客户端。**
-   - `payload` 按类型：`choice.select` → `{selected: [选项id]}`，或者只对中断的、允许文字回答的块用 `{freeText: "…"}`（两者恰好一个；其他块的文字回答走普通消息，见 3.2、4.8）；`confirmation.respond` → `{outcome: "confirm" | "cancel"}`；`form.submit` → `{values: {字段key: 值}}`。
+   - `payload` 按类型：`choice.select` → `{selected: [选项id]}`；`confirmation.respond` → `{outcome: "confirm" | "cancel"}`；`form.submit` → `{values: {字段key: 值}}`。三种都可以改为 `{freeText: "…"}`（与上面的字段恰好一个），但只对**开着的中断**的块、且中断的 `otherInput` 不为 `false` 时有效（4.8 第 10 条）；已经结束的消息里的文字回答走普通消息（3.2）。
 3. **ActionResult（动作结果）**：服务端返回。块所在的消息已经结束（最终回答里附带的问题）时，结果带 `rev` 补丁，引发的新一轮是一条新消息（`followUp`）：
 
    ```json
@@ -525,7 +531,7 @@ streaming ──message.paused──▶ paused ──(回答) block.patch + mess
 
 1. 按 `context.messageId` / `blockId` **从宿主存储加载持久化的块**（宿主的加载函数同时做作用域校验，查不到即 `not_found`）。
 2. 块里必须声明了 ActionSpec，且 `type`、`target` 与请求一致（否则 `target_mismatch`）；块状态必须是 `open`（否则按当前状态返回 `already_resolved` / `superseded`，并附上当前状态的补丁），未过期（否则 `expired`，同样附上补丁）。
-3. **按块自身的声明校验 payload**：选的选项必须在 `options` 里、数量符合 `selection` / `minSelect` / `maxSelect`；表单值必须满足字段的类型、必填、范围、长度、选项。客户端无法提交块里没出现过的值。
+3. **按块自身的声明校验 payload**：选的选项必须在 `options` 里、数量符合 `selection` / `minSelect` / `maxSelect`；表单值必须满足字段的类型、必填、范围、长度、选项。客户端无法提交块里没出现过的值。`freeText` 只在块是一个开着的中断的块、且该中断的 `otherInput` 不为 `false` 时接受（否则 `invalid_payload`），长度 1–500 字符，原样交给宿主，不做语义校验。
 4. 处理器标记为破坏性时，请求必须来自 `severity: destructive` 的确认块，且 `outcome = confirm`（否则 `confirmation_required`）。
 5. 幂等检查：同一个 `id` 已有结果则直接返回（`replayed: true`）。
 6. 调用宿主处理器的 `authorize`（宿主自己的权限检查），再调用 `execute`。
@@ -630,7 +636,7 @@ ChatWeave-Protocol: 0.1
 | 步骤嵌套层数 | 3 |
 | 步骤 `label` / `summary` | 60 / 120 字符 |
 | 每次暂停等待的中断 | 1 |
-| `choice.select` 的 `freeText` | 500 字符 |
+| 动作的 `freeText`（三种动作） | 500 字符 |
 
 数量与长度上限写在 Schema 里；字节大小、深度、节点数由库的 `Limits` 校验（Schema 难以表达）。宿主可以把限制**调得更严**，不能调得比协议默认更宽（否则别的消费方可能拒收）。超限时生产方必须截断（并填 `totalRows` 之类的说明）或改发 markdown，不得发出超限块。
 
@@ -659,8 +665,8 @@ A2UI 管的是“内容长什么样”，而“Agent 正在做什么”（运行
 |---|---|---|
 | `message.start` / `message.end` | `RUN_STARTED` / `RUN_FINISHED`；`RUN_ERROR` | 一条助手消息里每一段“开始或继续 → 暂停或结束”对应一次运行（见下方第 9 条）。用户停止（`interrupted` + `cancelled`）≈ `outcome.type = "cancelled"` |
 | `message.paused{interrupt}` | `RUN_FINISHED{outcome: {type: "interrupt", interrupts: [Interrupt]}}` | `Interrupt.id = interrupt.id`，`reason` 相同（`confirmation` / `input_required`），`message` = 块的 `fallbackText`，`expiresAt` = 块的 `action.expiresAt`，`metadata` 放 `stepId`、`blockId`；子 Agent 里发起的中断带 `subagentRunId`（见下） |
-| 动作回答中断 + `message.resumed` | 新一次运行：`RunAgentInput.resume = [{interruptId, status: "resolved", payload}]`，`RUN_STARTED` | `payload` = 动作的 `payload`（`selected` / `freeText` / `outcome` / `values`）；确认卡上点“取消”也是 `resolved`，拒绝写在 `payload` 里（与 AG-UI 一致） |
-| 暂停中停止 / 发新消息 / 过期 | `resume` 里 `status: "cancelled"` 的运行以 `outcome.type = "cancelled"` 结束；过期 ≈ AG-UI 规定的过期答复 `RUN_ERROR` | ChatWeave 都以 `message.end{interrupted}` 结束这条消息（4.8 第 15–17 条） |
+| 动作回答中断 + `message.resumed` | 新一次运行：`RunAgentInput.resume = [{interruptId, status: "resolved", payload}]`，`RUN_STARTED` | `payload` = 动作的 `payload`（`selected` / `outcome` / `values`，或任一动作的 `freeText`）；`otherInput` 是 ChatWeave 的扩展，放进 `Interrupt.metadata`；确认卡上点“取消”也是 `resolved`，拒绝写在 `payload` 里（与 AG-UI 一致） |
+| 暂停中停止（含按 4.8 第 16 条先停止）/ 过期 | `resume` 里 `status: "cancelled"` 的运行以 `outcome.type = "cancelled"` 结束；过期 ≈ AG-UI 规定的过期答复 `RUN_ERROR` | ChatWeave 都以 `message.end{interrupted}` 结束这条消息（4.8 第 15–17 条） |
 | `step.started{stepId, label}` | `STEP_STARTED{stepName, metadata?}` | 转换时 `stepName = stepId`，`label` 放进 `metadata.label` |
 | `step.finished{stepId, state, durationMs, summary?}` | `STEP_FINISHED{stepName, metadata?}` | 转换时 `stepName = stepId`，其余字段放进 `metadata` |
 | `step.started{kind: "delegate"}` | 再加一个 `SUBAGENT_STARTED{subagentRunId, name, parentSubagentRunId?}` | `subagentRunId` 由委派步骤的 `stepId` 派生（消息内唯一，一次委派一个值）；`name = label`（ChatWeave 不下发子 Agent 的内部名字）；外层还有委派步骤时 `parentSubagentRunId` 指向它 |

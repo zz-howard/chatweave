@@ -158,7 +158,7 @@ seq 6 之后服务端关闭这条流。这时持久化的暂停检查点（`fold
 
 **变体：暂停很久之后在另一台设备上回答。** 用户第二天在另一台手机上打开会话：活动消息列表里有 `{messageId: "msg_03", status: "paused", lastSeq: 6}`，客户端订阅这条消息；事件日志早已过期，服务端发暂停检查点的快照（`seq: 6`）后关闭。用户回答后照常继续，收到 seq 7 起的事件。第一台手机下次打开会话时同样从活动消息列表或同步下来的最终版本拿到结果。
 
-**变体：暂停中停止。** 用户没有回答，按了“停止”（或在输入框里发了别的内容，而这张卡不接受文字回答）：
+**变体：暂停中停止。** 用户没有回答，按了“停止”（或宿主收到一条没法拒绝的新消息、按 [protocol.md 4.8](protocol.md#48-中断暂停与继续同一条消息) 第 16 条先停止）：
 
 ```json
 {…,"type":"block.patch","seq":7,"blockId":"b1","patch":{"data":{"state":{"status":"cancelled","reason":{"code":"stopped"}}}}}
@@ -370,7 +370,7 @@ data: {"protocolVersion":"0.1","type":"block.start","messageId":"msg_01","seq":2
 | 用户点“停止生成”（显式停止请求，见 4.4） | 停止生产；仍在运行的步骤各发一个 `step.finished{state: cancelled}`，再发 `message.end{status: interrupted, error.code: cancelled}`，持久化已产出的部分 | 已出现的内容保留（不清空、不回退），末尾标“已停止”；过程条里被停下的步骤显示“已停止”；断线**不**属于这种情况 |
 | 某个步骤失败（工具出错、超时） | 发 `step.finished{state: failed, summary?}`，其他步骤和回答照常继续 | 过程条里只有这一行显示失败，不影响其他行和正文 |
 | 运行中途要用户确认 / 回答（中断） | 发交互块，`message.paused`，写暂停检查点，关闭流；回答后同一条消息继续 | 已出现的内容保留；过程条那一行“等你确认”，交互块可操作；不显示“连接中断”和生成中的光标、临时提示；停止按钮仍可用 |
-| 暂停中停止、发新消息或中断过期 | 块 → `cancelled`（`stopped`）或 `expired`，等待的步骤 → `cancelled`，`message.end{interrupted}`（`cancelled` / `interrupt_expired`） | 卡片显示“已停止”或“已过期”，过程条那一行“已停止”，消息末尾标“已停止”或“确认已过期” |
+| 暂停中停止（含宿主按 4.8 第 16 条先停止）或中断过期 | 块 → `cancelled`（`stopped`）或 `expired`，等待的步骤 → `cancelled`，`message.end{interrupted}`（`cancelled` / `interrupt_expired`） | 卡片显示“已停止”或“已过期”，过程条那一行“已停止”，消息末尾标“已停止”或“确认已过期” |
 | 上游模型失败 | 已有内容保留，`message.end{status: interrupted 或 error}`；全无内容时 `fallbackText` 说明原因 | 显示已有内容 + 一行错误说明，宿主可提供“重试” |
 | 某个组件块的数据没拿到（工具失败、校验失败） | `block.end{status: error, fallbackText: "天气数据暂时无法获取"}`，消息继续 | 占位原地换成一行兜底文字，不移除块、不影响后续块 |
 | 服务端进程崩溃 | 暂停中的消息不受影响（检查点是权威状态）。重启后扫描超过租约仍为 `streaming` 的消息：有持久日志时用同一个折叠函数把日志折叠成消息；默认的进程内缓冲时用最近的检查点（4.1）。仍在运行的步骤记为 `failed`，消息标 `interrupted` 并持久化 | 续传时拿到剩余事件或快照（默认实现下是快照） |

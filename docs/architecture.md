@@ -144,8 +144,8 @@ pub trait ActionStore<Ctx>: Send + Sync {
 
 | 包 | 提供 | 宿主要实现 |
 |---|---|---|
-| `chatweave_core` | 不可变模型类（手写 `fromJson` / `toJson`，**不依赖 build_runner**，减少宿主的依赖负担）；`SseDecoder`（字节流 → SSE 帧，可接任何 HTTP 客户端的字节流）；`EventParser`；`BlockStore`（单一写入口，按 `seq` 去重、按块 ID 合并、运行步骤与块分开保存、`rev` 规则、与持久化版本对账、按消息 `id` 对账乐观用户消息——用户消息 ID 由客户端生成）；`StreamController`（续传状态机、触发时机、退避与上限、“已请求停止”状态、临时进度提示、按会话找回正在生成的消息）；`InteractionController`（交互块的本地显示状态与幂等键）；`ViewportController`（纯函数的滚动状态机）；`inspect()` 只读快照；`Limits` 检查；`MemoryTransport` / `ScriptedTransport` 与宿主实现一致性套件 | `ChatWeaveStore`（持久化消息与续传进度，例如用 drift）、`StreamTransport`（打开 SSE 字节流，例如用 dio）、`ActionTransport`（提交动作，例如走离线队列；可以不提供，此时交互块只读） |
-| `chatweave_flutter` | `ChatWeaveList`（消息列表）、`ChatWeaveComposer`（输入框）、`MessageView`（含正文之上的运行过程条 `ProcessStrip`）、`MarkdownBlockView`（基于 `flutter_markdown_plus` 的受限子集）、`BlockRegistry`（含按块的错误隔离）、默认组件、`ChatWeaveTheme` 主题接口与中性浅色 / 深色默认主题；可选的只读调试面板 `ChatWeaveDebugOverlay` | `ChatWeaveThemeData` 的实现（品牌皮肤）、自定义块组件（例如业务卡片）、可选的用户消息 / 消息外框构建器 |
+| `chatweave_core` | 不可变模型类（手写 `fromJson` / `toJson`，**不依赖 build_runner**，减少宿主的依赖负担）；`SseDecoder`（字节流 → SSE 帧，可接任何 HTTP 客户端的字节流）；`EventParser`；`BlockStore`（单一写入口，按 `seq` 去重、按块 ID 合并、运行步骤与块分开保存、`rev` 规则、与持久化版本对账、按消息 `id` 对账乐观用户消息——用户消息 ID 由客户端生成）；`StreamController`（续传状态机、触发时机、退避与上限、“已请求停止”状态、临时进度提示、按会话找回正在生成的消息）；`InteractionController`（交互块的本地显示状态与幂等键）；`InterruptComposerController`（暂停时输入框的锁定 / 回答状态，[rendering.md 4.5](rendering.md#45-输入框联动composer-契约)）；`ViewportController`（纯函数的滚动状态机）；`inspect()` 只读快照；`Limits` 检查；`MemoryTransport` / `ScriptedTransport` 与宿主实现一致性套件 | `ChatWeaveStore`（持久化消息与续传进度，例如用 drift）、`StreamTransport`（打开 SSE 字节流，例如用 dio）、`ActionTransport`（提交动作，例如走离线队列；可以不提供，此时交互块只读） |
+| `chatweave_flutter` | `ChatWeaveList`（消息列表）、`ChatWeaveComposer`（输入框，含中断时的锁定与“回答”标签 `InterruptAnswerChip`）、`MessageView`（含正文之上的运行过程条 `ProcessStrip`）、`MarkdownBlockView`（基于 `flutter_markdown_plus` 的受限子集）、`BlockRegistry`（含按块的错误隔离）、默认组件、`ChatWeaveTheme` 主题接口与中性浅色 / 深色默认主题；可选的只读调试面板 `ChatWeaveDebugOverlay` | `ChatWeaveThemeData` 的实现（品牌皮肤）、自定义块组件（例如业务卡片）、可选的用户消息 / 消息外框构建器 |
 
 存储接口草图（示意）：
 

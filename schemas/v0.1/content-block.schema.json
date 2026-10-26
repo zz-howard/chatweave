@@ -200,7 +200,7 @@
           "items": { "type": "string", "maxLength": 64 }
         },
         "freeText": {
-          "description": "Set by the server when a choice was answered with text instead of an option: through choice.select {freeText} when the block belongs to an open interrupt, otherwise with a normal user message.",
+          "description": "Set by the server when the block was answered with text instead of its own controls: through the block's action with {freeText} when the block belongs to an open interrupt (any interactive type, via the card's 'other input' entry, D60), or, for a choice in a message that has ended, with a normal user message (D22).",
           "type": "string",
           "maxLength": 500
         },
@@ -523,7 +523,7 @@
         "selection": { "type": "string", "enum": ["single", "multiple"], "default": "single" },
         "minSelect": { "type": "integer", "minimum": 0, "maximum": 10 },
         "maxSelect": { "type": "integer", "minimum": 1, "maximum": 10 },
-        "allowFreeText": { "type": "boolean", "default": false },
+        "allowFreeText": { "description": "Only for a choice in a message that has ended (a question at the end of a final answer): the user may also answer by sending a normal message (D22). Ignored for the block of an interrupt, whose free-text entry is governed by interrupt.otherInput (D60).", "type": "boolean", "default": false },
         "action": {
           "allOf": [
             { "$ref": "action.schema.json#/$defs/actionSpec" },

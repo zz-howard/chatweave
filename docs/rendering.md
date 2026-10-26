@@ -62,9 +62,9 @@ final registry = BlockRegistry.withDefaults()          // 内置 10 种类型的
 | `time_series` | `LineChartView` | 自绘折线（`CustomPainter`），不引入图表库；坐标轴、图例、缺测断线；点按可切换“表格视图” |
 | `comparison` | `ComparisonTable` | 对象为列、维度为行；`assessment` 用主题的语义色 + 文字标签；结论在表下方 |
 | `status` | `StatusView` | 状态图标 + 文字；有 `progress` 显示进度条；有 `steps` 显示步骤列表 |
-| `choice` | `ChoiceView` | 选项按钮组；单选 / 多选；`allowFreeText` 时提示“也可以直接输入回答”（块是中断的提问时，输入框里的文字作为这张卡的回答经动作通道提交、显示在卡片上；否则作为普通消息发出，见 4.4）；点按后整组显示“提交中”；`state` 非 `open` 时显示**服务端记录的**选项、回答者与时间，并禁用 |
-| `confirmation` | `ConfirmationCard` | 标题、说明、细节表；破坏性操作的确认按钮用主题的“危险”样式，且必须二次点按（或按住）才能提交；点按后显示“提交中”，服务端确认后才显示“已确认 / 已取消” |
-| `form_intent` | `IntentForm` | 按字段类型生成输入控件；客户端先做必填 / 范围 / 长度校验；服务端返回的 `fieldErrors` 显示在对应字段下 |
+| `choice` | `ChoiceView` | 选项按钮组；单选 / 多选；块是中断的提问且 `otherInput` 不为 `false` 时，选项后面固定多一个“输入其他内容”（点了进入输入框的回答状态，见 4.5）；已经结束的消息里 `allowFreeText` 时提示“也可以直接发消息回答”；点按后整组显示“提交中”；`state` 非 `open` 时显示**服务端记录的**选项、回答者与时间，并禁用 |
+| `confirmation` | `ConfirmationCard` | 标题、说明、细节表；破坏性操作的确认按钮用主题的“危险”样式，且必须二次点按（或按住）才能提交；是中断的块且 `otherInput` 不为 `false` 时按钮下方有“输入其他内容”；点按后显示“提交中”，服务端确认后才显示“已确认 / 已取消” |
+| `form_intent` | `IntentForm` | 按字段类型生成输入控件；客户端先做必填 / 范围 / 长度校验；服务端返回的 `fieldErrors` 显示在对应字段下；是中断的块且 `otherInput` 不为 `false` 时提交按钮下方有“输入其他内容” |
 
 默认组件只用 Flutter `widgets` 层能力和主题接口取样式，不依赖 Material 的颜色或文字主题（Markdown 渲染依赖的 `flutter_markdown_plus` 内部用到 Material，样式表仍完全由主题接口提供）。
 
@@ -164,9 +164,57 @@ final registry = BlockRegistry.withDefaults()          // 内置 10 种类型的
 - **暂停中**：已出现的文字和组件照常显示；问题所在的交互块可操作；没有生成中的光标和临时提示，也不显示“连接中断”；过程条保持展开，那一行“等你确认 / 等你回答”。停止按钮仍可用（停止后卡片显示“已停止，没有等到回答”）。
 - **回答**：交互块照常“提交中 → 服务端结果”（4.2，不乐观显示）。回答显示在**卡片上**（选中的选项打勾、“已确认”、文字回答显示为卡片里的一行“你的回答：……”），**不**在对话里多出一条用户气泡。
 - **继续**：收到继续之后的事件，新内容接在这条消息下面出现（不是新的一条消息），过程条那一行回到运行中；滚动规则与生成中相同（用户在底部时跟随）。
-- **输入框**：有一个暂停中的中断时，`ChatWeaveComposer` 从 `chatweave_core` 读到它：如果它是允许文字回答的选项块，输入框提示“回答上面的问题”，发出的文字作为这张卡的回答（经 `ActionTransport`），不是新消息；否则输入框照常发新消息，宿主服务端会先停止暂停中的那条消息（卡片随之显示“已停止”）。
+- **输入框**：有一个暂停中的中断、当前查看者可以回答时，输入框**锁定**；用户点卡片上的“输入其他内容”后输入框解锁并挂上“回答：<问题>”标签，发出的文字是这张卡的回答（经 `ActionTransport`），不是新消息。完整契约见 4.5。
 - **通知**：暂停时宿主可以发一条“需要你确认”的通知，文字取 `message.paused.fallbackText`；库只提供回调，不发通知。
 - **最终回答里带着问题**（消息已经结束，例如“要我给‘交水费’设个提醒吗？”）不是暂停：用户的回答是一条新消息，AI 的回复是新的一条。
+
+### 4.5 输入框联动（Composer 契约）
+
+消息暂停等一个中断时，输入框要配合，让用户清楚“现在打的字算什么”。这是库级的界面契约（[D61](decisions.md)）：状态和动作由 `chatweave_core` 的 `InterruptComposerController` 管理（按会话一个，纯本地显示状态，不进协议），`ChatWeaveComposer` 默认实现全部行为；宿主用自己的输入框时接同一个控制器。
+
+**状态**
+
+| 状态 | 何时 | 输入框 | 交互块 |
+|---|---|---|---|
+| `free` | 没有开着的中断；或当前查看者不能回答（只读、没有 `ActionTransport`、宿主判定不能答）；或锁定策略为 `never` | 照常发新消息 | — |
+| `locked` | 会话里有一条 `paused` 的消息，中断的块仍是 `open`，当前查看者可以回答 | **锁定**：发不出普通消息，附件等入口也禁用；显示提示（默认“先回答上面的问题”）；已有草稿保留不清空；点锁定的输入框 = 滚动到中断的块并提示“其他内容”入口，不弹键盘 | 可操作；`otherInput` 不为 `false` 时带“输入其他内容” |
+| `answering` | 用户点了“输入其他内容”（`beginOtherInput()`） | **解锁**并聚焦；上方挂“回答”标签 `InterruptAnswerChip`：“回答：<问题>”+ ✕；发出的文字是这个中断的 `freeText` 回答，不是消息；只收文字，附件仍禁用 | 照常可点；点了卡上的控件就按控件回答，标签消失 |
+| `submitting` | 文字回答已提交、服务端结果还没到（含离线排队） | 锁定；标签显示“提交中…”或“已排队，联网后提交”；提交的文字留在控制器里 | “提交中 / 已排队”（4.2） |
+
+**转换**
+
+- `free → locked`：中断出现（流里的 `message.paused`、快照、活动消息列表或同步下来的暂停检查点）。草稿不清空。
+- `locked → answering`：`beginOtherInput()`；`otherInput: false` 时卡上没有入口，调用无效。
+- `answering → locked`：点标签上的 ✕（`cancelOtherInput()`），已经打的字保留，下次进入 `answering` 时还在。
+- `answering → submitting`：`submitOtherInput(text)`：生成 `{freeText}` 动作（动作 ID 规则同 [protocol.md 5.1](protocol.md#51-三个对象)，重发复用同一个 ID），经 `ActionTransport` 提交。文字为空或超过 500 字符时不提交。
+- `submitting →`：`accepted`（带 `resume`）→ `free`，清空草稿；服务端明确拒绝且块仍 `open`（`invalid_payload`、`conflict` 等）→ 回到 `answering`，文字放回输入框，标签下显示服务端的 `message`；`unavailable` 或超时 → 保持 `submitting`，刷新块状态、用同一个 ID 重试。
+- **中断在别处被关闭**（另一台设备已回答、过期、停止、块变成 `cancelled` / `superseded`）：任何状态 → `free`，控制器给出 `closedReason`（`answered_elsewhere` / `expired` / `stopped` / `withdrawn`）；草稿留在输入框里变回普通草稿，宿主据此提示一句，免得用户把它当成回答发出去。
+- 消息继续（`message.resumed`）后按生成中的普通规则处理。最终回答里带着问题（消息已经结束）**不**进入 `locked`。
+
+**宿主接线（草图，未编译）**
+
+```dart
+final composer = InterruptComposerController(
+  store: blockStore, interactions: interactionController, actions: actionTransport,
+  conversationId: conversationId,
+  lockPolicy: ComposerLockPolicy.answerers,   // 默认；也可 everyone / never
+)..attachDraft(myTextController);              // 草稿归宿主的输入框：锁定时不清空、✕ 时保留、被拒时放回、接受后清空
+
+ValueListenableBuilder<InterruptComposerState>(
+  valueListenable: composer.state,
+  builder: (context, s, _) => switch (s) {
+    ComposerFree() => MyComposer(onSend: sendMessage),
+    ComposerLocked(:final hasDraft) => MyComposer(locked: true, hint: l10n.answerAboveFirst(hasDraft), onTapLocked: composer.revealInterrupt),
+    ComposerAnswering(:final question) => MyComposer(chip: InterruptAnswerChip(question: question, onClose: composer.cancelOtherInput), onSend: composer.submitOtherInput),
+    ComposerSubmitting(:final queued) => MyComposer(locked: true, chip: InterruptAnswerChip.pending(queued: queued)),
+  },
+);
+```
+
+- 标签里的问题取块的 `choice.prompt` / `confirmation.title` / `form_intent.title`（没有时 `purpose`），单行省略。
+- 外观：`answerChipBuilder`、`lockedComposerBuilder` 可换成宿主皮肤；文案经宿主本地化，库自带中文、英文默认值（“输入其他内容”“先回答上面的问题”“回答：”）。
+- **锁定策略**：`answerers`（默认：只锁能回答这个中断的人；一对一会话就是那位用户；群聊里其他成员照常聊天）/ `everyone` / `never`（宿主自己处理，此时“输入其他内容”仍会进入 `answering`）。服务端对“中断开着时到达的新消息”的处理见 [protocol.md 4.8](protocol.md#48-中断暂停与继续同一条消息) 第 16 条。
+- **无障碍**：锁定时输入框语义为“已锁定”并读出提示；进入 `answering` 时焦点移到输入框，读出“正在回答：<问题>”；✕ 的语义标签是“取消回答，返回选项”；状态变化礼貌播报一次。
 
 ## 5. 主题接口
 
@@ -218,7 +266,7 @@ class ChatWeaveThemeData {
 
 ## 7. 测试
 
-- **组件测试**：每个默认组件 × 正常 / 边界（最长标签、最多行、空数据）/ 降级 / 交互状态（open、提交中、已排队、resolved（这台设备答 / 另一台设备或群聊里别人先答 / 用户取消）、expired、cancelled（带原因）、superseded、只读）；生成中的消息 × 临时进度提示 / 正在停止；过程条 × 运行中 / 全部完成 / 有失败 / 暂停等你确认 / 回答后继续并完成（行尾显示回答）/ 暂停中停止 / 中断过期 / 子 Agent 收起与展开（含 3 层）/ 子 Agent 里的中断（委派行显示“等你确认”）/ 生成中停止 / 手动展开后不再自动收起 / 历史消息默认收起 / 最长标签 / 200% 字号；暂停中的消息 × 输入框作为回答 / 输入框发新消息。
+- **组件测试**：每个默认组件 × 正常 / 边界（最长标签、最多行、空数据）/ 降级 / 交互状态（open、提交中、已排队、resolved（这台设备答 / 另一台设备或群聊里别人先答 / 用户取消）、expired、cancelled（带原因）、superseded、只读）；生成中的消息 × 临时进度提示 / 正在停止；过程条 × 运行中 / 全部完成 / 有失败 / 暂停等你确认 / 回答后继续并完成（行尾显示回答）/ 暂停中停止 / 中断过期 / 子 Agent 收起与展开（含 3 层）/ 子 Agent 里的中断（委派行显示“等你确认”）/ 生成中停止 / 手动展开后不再自动收起 / 历史消息默认收起 / 最长标签 / 200% 字号；暂停中的消息 × 输入框 `locked` / `answering`（带标签）/ ✕ 返回且草稿保留 / `submitting`（在线、已排队）/ 被拒绝后放回文字 / 被另一台设备回答后回到 `free` / `otherInput: false` 时卡上没有入口 / 已结束消息里的问题不锁定；`InterruptComposerController` 的状态转换用纯 Dart 单元测试逐条覆盖。
 - **golden 截图**（把界面渲染成图片与基准图逐像素比对）：在示例 App 中，每个组件 × 中性浅色 / 深色主题 × 两种宽度（360、430）× 100% / 200% 字号；固定字体与工具链生成。
 - **流式测试**：用一致性夹具驱动 `BlockStore`，断言每一步的组件树与最终 `fold` 结果；断言块类型在 `block.start` 后不变、已渲染的文字不会被替换成组件。
 - **无障碍测试**：`meetsGuideline(androidTapTargetGuideline)`、`textContrastGuideline`、语义树快照。

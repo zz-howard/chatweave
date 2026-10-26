@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/zz-howard/chatweave/schemas/v0.1/generation.schema.json",
   "title": "ChatWeave Generation Control (draft 0.1)",
-  "description": "DRAFT. Responses of the generation-control endpoints (paths chosen by the host, see docs/protocol.md 4.6): starting a generation returns the assistant message id synchronously; stopping is an explicit, idempotent request distinct from disconnecting; a per-conversation query lists messages still being generated so a client killed before it learned the id can re-attach. These are not block actions and do not use the Action protocol.",
+  "description": "DRAFT. Responses of the generation-control endpoints (paths chosen by the host, see docs/protocol.md 4.6): starting a generation returns the assistant message id synchronously (or startRejected while an interrupt is open); stopping is an explicit, idempotent request distinct from disconnecting; a per-conversation query lists messages still being generated so a client killed before it learned the id can re-attach. These are not block actions and do not use the Action protocol.",
   "$defs": {
     "startResponse": {
       "description": "Returned by the host's submit-user-message endpoint BEFORE generation produces output. Resubmitting the same user message id returns the same assistant messageId with replayed=true and never starts a second generation.",
@@ -28,6 +28,36 @@
         "replayed": {
           "type": "boolean",
           "default": false
+        }
+      }
+    },
+    "startRejected": {
+      "description": "Returned by the host's submit-user-message endpoint when it refuses to start because the conversation has an open interrupt that this user can answer (docs/protocol.md 4.8 rule 16, D62). The user message is not stored and no generation starts; the client shows the pending card and locks the composer (keeping the draft). Hosts that cannot refuse a submission (e.g. an offline-queued message) instead stop the paused message first and start normally.",
+      "type": "object",
+      "required": ["userMessageId", "error", "pending"],
+      "additionalProperties": false,
+      "properties": {
+        "userMessageId": {
+          "$ref": "action.schema.json#/$defs/actionId"
+        },
+        "error": {
+          "type": "object",
+          "required": ["code", "message"],
+          "additionalProperties": false,
+          "properties": {
+            "code": { "type": "string", "enum": ["interrupt_pending"] },
+            "message": { "type": "string", "maxLength": 500 }
+          }
+        },
+        "pending": {
+          "description": "The paused message and its open interrupt.",
+          "type": "object",
+          "required": ["messageId", "interruptId"],
+          "additionalProperties": false,
+          "properties": {
+            "messageId": { "$ref": "action.schema.json#/$defs/messageId" },
+            "interruptId": { "$ref": "message.schema.json#/$defs/interruptId" }
+          }
         }
       }
     },
@@ -101,6 +131,9 @@
   "oneOf": [
     {
       "$ref": "#/$defs/startResponse"
+    },
+    {
+      "$ref": "#/$defs/startRejected"
     },
     {
       "$ref": "#/$defs/stopResponse"
