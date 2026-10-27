@@ -7,6 +7,8 @@ environment:
   flutter: '>=3.47.8'
 resolution: workspace
 dependencies:
+  flutter_markdown_plus: ^1.0.12
+  markdown: ^7.3.1
   chatweave_core: ^0.1.0
   flutter:
     sdk: flutter
