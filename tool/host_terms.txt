@@ -1,0 +1,10 @@
+# Generic business vocabulary prohibited in library and example sources.
+账本
+空间
+账户
+余额
+记账
+ledger
+balance
+bookkeeping
+account

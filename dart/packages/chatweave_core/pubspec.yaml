@@ -1,0 +1,9 @@
+name: chatweave_core
+description: Transport-independent ChatWeave protocol core.
+version: 0.1.0
+repository: https://github.com/zz-howard/chatweave
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+resolution: workspace
+dev_dependencies:
+  test: ^1.25.15
