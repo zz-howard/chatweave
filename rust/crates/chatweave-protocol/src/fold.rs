@@ -30,6 +30,32 @@ pub struct FoldState {
 }
 impl FoldState {
     pub fn new()->Self {Self::default()}
+    /// Restores authoritative storage state without wrapping it in a transport
+    /// event. A legal Message may exceed the smaller single-event byte limit.
+    pub fn from_checkpoint(message: Message, last_seq: u64) -> Result<Self> {
+        if last_seq == 0 || last_seq > builtin().limits.max_events as u64 {
+            return Err(error("invalid_checkpoint", "checkpoint sequence is outside the reliable event budget"));
+        }
+        builtin().check_message(&message.0, false)?;
+        if let Some(recorded) = message.0["lastSeq"].as_u64()
+            && recorded != last_seq
+        {
+            return Err(error("snapshot_seq", "checkpoint sequence differs from its message"));
+        }
+        let mut message = message.0;
+        message.as_object_mut().expect("validated message object").remove("lastSeq");
+        let mut interrupt_ids = BTreeSet::new();
+        if let Some(id) = message.pointer("/interrupt/id").and_then(Value::as_str) {
+            interrupt_ids.insert(id.to_owned());
+        }
+        Ok(Self {
+            message: Some(message),
+            last_seq,
+            interrupt_ids,
+            previous_answer: None,
+            legacy_steps: false,
+        })
+    }
     /// Simulates consumers that do not implement stream.steps.
     pub fn with_legacy_steps()->Self { Self{legacy_steps:true,..Self::default()} }
     pub fn last_seq(&self)->u64 {self.last_seq}
@@ -58,12 +84,18 @@ impl FoldState {
         let seq=e["seq"].as_u64().filter(|n|*n>0).ok_or_else(||error("missing_seq","reliable event needs seq"))?;
         if ty=="message.snapshot" {
             if seq<self.last_seq {return Ok(());}
+            builtin().limits.check_event(e)?;
+            if seq > builtin().limits.max_events as u64 {
+                return Err(error("limit_exceeded", "snapshot exceeds reliable event budget"));
+            }
             builtin().validate_schema_only(DocumentKind::Event,e)?;
             let mut message=e["message"].clone();
             if message["id"]!=e["messageId"] {return Err(error("message_mismatch","snapshot id differs"));}
             builtin().check_message(&message,false)?;
-            if let Some(last)=message["lastSeq"].as_u64() {
-                if last!=seq {return Err(error("snapshot_seq","checkpoint seq differs"));}
+            if let Some(last)=message["lastSeq"].as_u64()
+                && last != seq
+            {
+                return Err(error("snapshot_seq", "checkpoint seq differs"));
             }
             message.as_object_mut().expect("message object").remove("lastSeq");
             if self.legacy_steps {message.as_object_mut().expect("message object").remove("steps");}

@@ -148,12 +148,12 @@ impl Validator {
         let ty = block["type"].as_str().unwrap_or("");
         if ty.starts_with("x-") {
             let version = block["schemaVersion"].as_u64().unwrap_or(0) as u32;
-            match self.custom.get(&(ty.into(),version)) {
-                Some(schema) => if let Some(data)=block.get("data") {
+            match (self.custom.get(&(ty.into(), version)), block.get("data")) {
+                (Some(schema), Some(data)) => {
                     schema.validate(data).map_err(|e|ProtocolError::new("schema",format!("/data{}",e.instance_path),e.to_string()))?;
-                },
-                None if strict => return Err(ProtocolError::new("unregistered_type","/type",ty)),
-                None => (),
+                }
+                (None, _) if strict => return Err(ProtocolError::new("unregistered_type","/type",ty)),
+                _ => (),
             }
         }
         if block.pointer("/metadata/provenance") == Some(&Value::String("adapter".into())) && ty != "markdown" {
@@ -184,16 +184,18 @@ impl Validator {
                     depth+1
                 } else {1};
                 if depth>3 { return Err(ProtocolError::new("step_depth","/steps","maximum depth is three")); }
-                if let Some(block)=step["blockId"].as_str() {
-                    if !block_ids.contains(block) {return Err(ProtocolError::new("invalid_block_reference","/steps",block));}
+                if let Some(block) = step["blockId"].as_str()
+                    && !block_ids.contains(block)
+                {
+                    return Err(ProtocolError::new("invalid_block_reference", "/steps", block));
                 }
-                if matches!(step["state"].as_str(), Some("running" | "awaiting_user")) {
-                    if let Some(parent) = step["parentStepId"].as_str() {
-                        let parent = steps.iter().find(|candidate| candidate["id"] == parent)
-                            .ok_or_else(|| ProtocolError::new("invalid_parent", "/steps", parent))?;
-                        if parent["state"] != "running" {
-                            return Err(ProtocolError::new("invalid_parent", "/steps", "active child requires a running delegate"));
-                        }
+                if matches!(step["state"].as_str(), Some("running" | "awaiting_user"))
+                    && let Some(parent) = step["parentStepId"].as_str()
+                {
+                    let parent = steps.iter().find(|candidate| candidate["id"] == parent)
+                        .ok_or_else(|| ProtocolError::new("invalid_parent", "/steps", parent))?;
+                    if parent["state"] != "running" {
+                        return Err(ProtocolError::new("invalid_parent", "/steps", "active child requires a running delegate"));
                     }
                 }
                 seen.insert(id,(step["kind"].as_str().unwrap_or(""),depth));
@@ -231,17 +233,19 @@ impl Validator {
         Ok(())
     }
     pub fn validate_stream(&self,events:&[StreamEvent])->Result<Message> {
-        if events.iter().filter(|e|e.seq().is_some()).count()>self.limits.max_events {
+        if events.iter().filter_map(StreamEvent::seq).max()
+            .is_some_and(|seq| seq > self.limits.max_events as u64) {
             return Err(ProtocolError::new("limit_exceeded","","event count exceeded"));
         }
         let mut state=FoldState::new();
         for event in events {
             self.validate(DocumentKind::Event,&event.0)?;
             state.apply(event.clone())?;
-            if event.event_type()=="block.data" {
-                if let Some(block)=state.message()?.0["blocks"].as_array().and_then(|bs|bs.iter().find(|b|b["id"]==event.0["blockId"])) {
-                    self.check_block(block,true)?;
-                }
+            if event.event_type() == "block.data"
+                && let Some(block) = state.message()?.0["blocks"].as_array()
+                    .and_then(|bs| bs.iter().find(|b| b["id"] == event.0["blockId"]))
+            {
+                self.check_block(block, true)?;
             }
         }
         let message=state.message()?;

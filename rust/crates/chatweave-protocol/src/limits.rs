@@ -52,12 +52,11 @@ impl Limits {
                 _ => (),
             }
         }
-        if block["type"] == "markdown" {
-            if let Some(text) = block.pointer("/data/text").and_then(Value::as_str) {
-                if text.len() > self.max_markdown_bytes {
-                    return Err(ProtocolError::new("limit_exceeded", "/data/text", "UTF-8 markdown byte limit exceeded"));
-                }
-            }
+        if block["type"] == "markdown"
+            && let Some(text) = block.pointer("/data/text").and_then(Value::as_str)
+            && text.len() > self.max_markdown_bytes
+        {
+            return Err(ProtocolError::new("limit_exceeded", "/data/text", "UTF-8 markdown byte limit exceeded"));
         }
         if let Some(data) = block.get("data") {
             self.check_data(data)?;
@@ -84,10 +83,10 @@ impl Limits {
     pub fn check_event(&self, event: &Value) -> Result<()> {
         self.check_bytes(event,self.max_event_bytes,"")?;
         if let Some(data) = event.get("data") { self.check_data(data)?; }
-        if let Some(text) = event.pointer("/delta/text").and_then(Value::as_str) {
-            if text.len() > self.max_delta_bytes {
-                return Err(ProtocolError::new("limit_exceeded","/delta/text","UTF-8 delta byte limit exceeded"));
-            }
+        if let Some(text) = event.pointer("/delta/text").and_then(Value::as_str)
+            && text.len() > self.max_delta_bytes
+        {
+            return Err(ProtocolError::new("limit_exceeded","/delta/text","UTF-8 delta byte limit exceeded"));
         }
         Ok(())
     }

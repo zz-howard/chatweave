@@ -68,3 +68,54 @@ fn final_time_is_only_taken_from_end_event() {
         assert!(state.message().unwrap().0.get("lastSeq").is_none());
     }
 }
+
+#[test]
+fn transport_replay_does_not_spend_the_reliable_event_budget_twice() {
+    let mut limits = Limits::default();
+    limits.max_events = 2;
+    let validator = Validator::new(limits, SchemaRegistry::default()).unwrap();
+    let beginning = start();
+    let ending = event(2, "message.end", json!({
+        "status":"complete", "fallbackText":"", "blockCount":0, "rev":1
+    }));
+    let message = validator.validate_stream(&[
+        beginning.clone(), beginning, ending.clone(), ending,
+    ]).unwrap();
+    assert_eq!(message.status(), "complete");
+}
+
+#[test]
+fn snapshots_obey_event_byte_and_sequence_limits() {
+    let final_message = json!({
+        "id":"message_1", "protocolVersion":"0.1", "role":"assistant",
+        "status":"complete", "rev":1, "fallbackText":"", "blocks":[],
+        "createdAt":"2026-10-26T09:30:00Z"
+    });
+    let mut huge = event(2, "message.snapshot", json!({"message":final_message}));
+    huge.0["message"]["metadata"] = json!({"note":"x".repeat(130 * 1024)});
+    assert_eq!(FoldState::new().apply(huge).unwrap_err().code, "limit_exceeded");
+    let beyond_budget = event(5_001, "message.snapshot", json!({"message":final_message}));
+    assert_eq!(FoldState::new().apply(beyond_budget).unwrap_err().code, "limit_exceeded");
+}
+
+#[test]
+fn storage_checkpoints_can_be_larger_than_transport_snapshot_events() {
+    let message = chatweave_protocol::Message(json!({
+        "id":"message_1", "protocolVersion":"0.1", "role":"assistant",
+        "status":"streaming", "rev":0, "lastSeq":2,
+        "fallbackText":"", "blocks":[],
+        "createdAt":"2026-10-26T09:30:00Z",
+        "metadata":{"note":"x".repeat(130 * 1024)}
+    }));
+    let size = serde_json::to_vec(&message).unwrap().len();
+    assert!(size > 128 * 1024 && size < 256 * 1024);
+    let mut restored = FoldState::from_checkpoint(message.clone(), 2).unwrap();
+    assert_eq!(restored.last_seq(), 2);
+    assert_eq!(restored.message().unwrap(), message);
+    restored.apply(event(3, "message.end", json!({
+        "status":"complete", "fallbackText":"", "blockCount":0, "rev":1
+    }))).unwrap();
+    assert_eq!(restored.message().unwrap().status(), "complete");
+    assert!(restored.message().unwrap().0.get("lastSeq").is_none());
+    assert!(FoldState::from_checkpoint(message, 3).is_err());
+}

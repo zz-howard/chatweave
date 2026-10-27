@@ -21,10 +21,10 @@ fn roundtrip(kind: DocumentKind, value: &Value) -> CheckResult<()> {
         DocumentKind::Message => serde_json::to_value(serde_json::from_value::<Message>(value.clone()).map_err(|e|e.to_string())?),
         DocumentKind::Block => {
             let block: Block = serde_json::from_value(value.clone()).map_err(|e|e.to_string())?;
-            if let Some(data) = block.typed_data().map_err(|e|e.to_string())? {
-                if data.to_value().map_err(|e|e.to_string())? != value["data"] {
-                    return Err("typed builtin data roundtrip changed JSON".into());
-                }
+            if let Some(data) = block.typed_data().map_err(|e|e.to_string())?
+                && data.to_value().map_err(|e|e.to_string())? != value["data"]
+            {
+                return Err("typed builtin data roundtrip changed JSON".into());
             }
             serde_json::to_value(block)
         }
@@ -83,9 +83,12 @@ pub fn run(repository: &Path) -> CheckResult<usize> {
     let mut count=0;
     for case in cases {
         let name=case["name"].as_str().unwrap_or("unnamed");
-        let mut case_registry=registry.clone();
-        register(&mut case_registry,&case["customSchemas"])?;
-        let validator=Validator::new(Limits::default(),case_registry).map_err(|e|format!("{name}: {e}"))?;
+        let case_validator = if case.get("customSchemas").is_some() {
+            let mut case_registry = registry.clone();
+            register(&mut case_registry, &case["customSchemas"])?;
+            Some(Validator::new(Limits::default(), case_registry).map_err(|e| format!("{name}: {e}"))?)
+        } else { None };
+        let validator = case_validator.as_ref().unwrap_or(&base_validator);
         let rejected=case["rejectAt"].as_str();
         let check:CheckResult<()>=if case["kind"]=="events" || case.get("events").is_some() {
             let path=file(case,"events")?;
@@ -135,7 +138,13 @@ pub fn run(repository: &Path) -> CheckResult<usize> {
         };
         check.map_err(|e|format!("manifest case {name}: {e}"))?;
         for key in ["expectedError","expected-error"] {
-            if let Some(path)=case[key].as_str() {read(&root.join(path))?;tracked.insert(path.into());}
+            if let Some(path) = case[key].as_str() {
+                let expected_error = read(&root.join(path))?;
+                if expected_error["rejectAt"].as_str() != rejected {
+                    return Err(format!("{path}: expected-error layer differs from manifest"));
+                }
+                tracked.insert(path.into());
+            }
         }
         count+=1;
     }
