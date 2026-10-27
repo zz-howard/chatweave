@@ -1,2 +1,10 @@
-/// Transport-independent ChatWeave core. Reserved for the client implementation.
-library;
+export 'src/model.dart';
+export 'src/fold.dart';
+export 'src/sse.dart';
+export 'src/store.dart';
+export 'src/ports.dart';
+export 'src/stream_controller.dart';
+export 'src/interaction.dart';
+export 'src/viewport.dart';
+export 'src/validation.dart';
+export 'src/memory_transport.dart';
