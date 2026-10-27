@@ -122,8 +122,15 @@ class ChatWeaveTextButton extends StatelessWidget {
 }
 
 class ChatWeaveControlIcon extends StatelessWidget {
-  const ChatWeaveControlIcon({super.key, this.close = false});
+  const ChatWeaveControlIcon({super.key, this.close = false})
+      : dropdown = false;
+
+  /// Downward caret for select fields; painted, so it never needs an icon font.
+  const ChatWeaveControlIcon.dropdown({super.key})
+      : close = false,
+        dropdown = true;
   final bool close;
+  final bool dropdown;
   @override
   Widget build(BuildContext context) => ExcludeSemantics(
         child: SizedBox(
@@ -133,6 +140,7 @@ class ChatWeaveControlIcon extends StatelessWidget {
             painter: _ControlIconPainter(
               close,
               ChatWeaveTheme.of(context).onSurface,
+              dropdown: dropdown,
             ),
           ),
         ),
@@ -140,15 +148,23 @@ class ChatWeaveControlIcon extends StatelessWidget {
 }
 
 class _ControlIconPainter extends CustomPainter {
-  const _ControlIconPainter(this.close, this.color);
+  const _ControlIconPainter(this.close, this.color, {this.dropdown = false});
   final bool close;
   final Color color;
+  final bool dropdown;
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
       ..strokeWidth = 2;
-    if (close) {
+    if (dropdown) {
+      final path = Path()
+        ..moveTo(7, 10)
+        ..lineTo(17, 10)
+        ..lineTo(12, 15)
+        ..close();
+      canvas.drawPath(path, paint);
+    } else if (close) {
       canvas.drawLine(const Offset(6, 6), const Offset(18, 18), paint);
       canvas.drawLine(const Offset(18, 6), const Offset(6, 18), paint);
     } else {
@@ -164,5 +180,7 @@ class _ControlIconPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ControlIconPainter oldDelegate) =>
-      oldDelegate.close != close || oldDelegate.color != color;
+      oldDelegate.close != close ||
+      oldDelegate.dropdown != dropdown ||
+      oldDelegate.color != color;
 }

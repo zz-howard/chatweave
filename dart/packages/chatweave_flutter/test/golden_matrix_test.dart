@@ -562,6 +562,8 @@ void main() {
               );
               await tester.pumpAndSettle();
               expect(tester.takeException(), isNull, reason: name);
+              expect(materialIconFontUses(tester), isEmpty,
+                  reason: '$name renders a MaterialIcons glyph');
               await expectLater(
                 tester,
                 meetsGuideline(androidTapTargetGuideline),
@@ -890,4 +892,28 @@ Block boundary(Block b, {bool maximum = false}) {
       ];
   }
   return Block.fromJson({...b.json, 'data': data});
+}
+
+/// Every rendered icon or text run that falls back to the MaterialIcons font.
+/// Hosts are not required to bundle that font, so it would show as tofu.
+List<String> materialIconFontUses(WidgetTester tester) {
+  bool isMaterial(String? family) =>
+      family != null && family.contains('MaterialIcons');
+  final uses = <String>[];
+  for (final icon in tester.widgetList<Icon>(find.byType(Icon))) {
+    if (isMaterial(icon.icon?.fontFamily)) uses.add('Icon(${icon.icon})');
+  }
+  for (final text in tester.widgetList<RichText>(find.byType(RichText))) {
+    text.text.visitChildren((span) {
+      if (span is TextSpan && isMaterial(span.style?.fontFamily)) {
+        uses.add('RichText(${span.text})');
+      }
+      return true;
+    });
+    final root = text.text;
+    if (root is TextSpan && isMaterial(root.style?.fontFamily)) {
+      uses.add('RichText(${root.text})');
+    }
+  }
+  return uses;
 }

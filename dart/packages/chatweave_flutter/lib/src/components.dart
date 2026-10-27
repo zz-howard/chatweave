@@ -779,6 +779,7 @@ class _InteractionBlockViewState extends State<InteractionBlockView> {
     if (field['type'] == 'single_select') {
       return DropdownButtonFormField<String>(
         focusNode: _focusFor(key),
+        icon: const ChatWeaveControlIcon.dropdown(),
         decoration: InputDecoration(
             labelText: '${field['label']}',
             errorStyle: TextStyle(color: ChatWeaveTheme.of(context).critical)),
