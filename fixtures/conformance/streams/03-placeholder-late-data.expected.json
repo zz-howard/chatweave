@@ -1,0 +1,31 @@
+{
+  "id": "msg_weather",
+  "protocolVersion": "0.1",
+  "conversationId": "conv_weather",
+  "role": "assistant",
+  "status": "complete",
+  "rev": 1,
+  "createdAt": "2026-10-26T09:30:00Z",
+  "fallbackText": "最高气温18°C天气晴朗。",
+  "blocks": [
+    {
+      "id": "b1",
+      "type": "metric",
+      "schemaVersion": 1,
+      "data": {
+        "label": "最高气温",
+        "value": 18,
+        "unit": "°C"
+      },
+      "fallbackText": "最高气温18°C"
+    },
+    {
+      "id": "b2",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    }
+  ]
+}

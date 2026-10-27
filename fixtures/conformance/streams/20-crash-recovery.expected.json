@@ -1,0 +1,19 @@
+{
+  "id": "msg_weather",
+  "protocolVersion": "0.1",
+  "conversationId": "conv_weather",
+  "role": "assistant",
+  "status": "interrupted",
+  "rev": 1,
+  "createdAt": "2026-10-26T09:30:00Z",
+  "fallbackText": "",
+  "blocks": [],
+  "steps": [
+    {
+      "id": "s1",
+      "label": "查天气",
+      "state": "failed",
+      "durationMs": 100
+    }
+  ]
+}

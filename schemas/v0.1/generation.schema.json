@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/zz-howard/chatweave/schemas/v0.1/generation.schema.json",
-  "title": "ChatWeave Generation Control (draft 0.1)",
-  "description": "DRAFT. Responses of the generation-control endpoints (paths chosen by the host, see docs/protocol.md 4.6): starting a generation returns the assistant message id synchronously (or startRejected while an interrupt is open); stopping is an explicit, idempotent request distinct from disconnecting; a per-conversation query lists messages still being generated so a client killed before it learned the id can re-attach. These are not block actions and do not use the Action protocol.",
+  "title": "ChatWeave Generation Control (0.1)",
+  "description": "Responses of the generation-control endpoints (paths chosen by the host, see docs/protocol.md 4.6): starting a generation returns the assistant message id synchronously (or startRejected while an interrupt is open); stopping is an explicit, idempotent request distinct from disconnecting; a per-conversation query lists messages still being generated so a client killed before it learned the id can re-attach. These are not block actions and do not use the Action protocol.",
   "$defs": {
     "startResponse": {
       "description": "Returned by the host's submit-user-message endpoint BEFORE generation produces output. Resubmitting the same user message id returns the same assistant messageId with replayed=true and never starts a second generation.",

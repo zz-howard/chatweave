@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'printf "%s:%s: dependency check failed\n" "${BASH_SOURCE[0]}" "$LINENO" >&2' ERR
+root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ ${1:-} == --root ]]; then
+  root="${2:?--root requires a directory}"
+  shift 2
+fi
+if (( $# )); then
+  printf 'usage: %s [--root DIRECTORY]\n' "$0" >&2
+  exit 2
+fi
+python3 - "$root" <<'PY'
+import json
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tomllib
+
+root = Path(sys.argv[1]).resolve()
+errors = []
+core = root / 'dart/packages/chatweave_core'
+manifest = core / 'pubspec.yaml'
+if not manifest.is_file():
+    sys.exit(f'{manifest}: missing package manifest')
+for number, line in enumerate(manifest.read_text().splitlines(), 1):
+    if re.search(r'(?:^|[\s{,])(flutter|flutter_test|flutter_driver|flutter_web_plugins)\s*:', line.split('#', 1)[0]):
+        errors.append(f'{manifest}:{number}: pure Dart core must not depend on Flutter')
+
+for path in sorted(core.rglob('*.dart')):
+    if any(part in {'.dart_tool', 'build'} for part in path.parts):
+        continue
+    text = path.read_text()
+    # Search complete directives so multiline and conditional imports are covered.
+    for match in re.finditer(r'\b(?:import|export)\s+[^;]+;', text, re.S):
+        if re.search(r'[\"\'](?:package:flutter(?:/|_)|dart:(?:io|html)(?:[\"\']))', match.group()):
+            number = text.count('\n', 0, match.start()) + 1
+            errors.append(f'{path}:{number}: forbidden platform import/export in pure Dart core')
+    for match in re.finditer(r'\b(?:MethodChannel|EventChannel|BasicMessageChannel|BinaryMessenger|PlatformChannel)\b', text):
+        number = text.count('\n', 0, match.start()) + 1
+        errors.append(f'{path}:{number}: platform channel must be injected by the application')
+
+examples = root / 'examples'
+if examples.exists():
+    for path in sorted(examples.rglob('*')):
+        if not path.is_file() or path.suffix not in {'.dart', '.rs'}:
+            continue
+        if any(part in {'target', 'build', '.dart_tool'} for part in path.parts):
+            continue
+        for number, line in enumerate(path.read_text().splitlines(), 1):
+            if re.search(r'package:chatweave_(?:core|flutter)/src/', line):
+                errors.append(f'{path}:{number}: examples must use public package entrypoints')
+            if re.search(r'(?:include(?:_str|_bytes)?!|#\[path).*crates/.*/src/', line):
+                errors.append(f'{path}:{number}: examples must use public crate APIs')
+
+workspace_manifest = root / 'rust/Cargo.toml'
+protocol_manifest = root / 'rust/crates/chatweave-protocol/Cargo.toml'
+try:
+    workspace = tomllib.loads(workspace_manifest.read_text())
+    protocol = tomllib.loads(protocol_manifest.read_text())
+except (OSError, tomllib.TOMLDecodeError) as error:
+    sys.exit(f'{protocol_manifest}: {error}')
+
+forbidden = {'axum', 'tokio', 'tokio-core', 'actix-web', 'actix-rt', 'warp',
+             'rocket', 'async-std', 'smol', 'tide', 'salvo', 'poem', 'ntex'}
+sections = [protocol]
+sections.extend(protocol.get('target', {}).values())
+for section in sections:
+    for category in ('dependencies', 'build-dependencies', 'dev-dependencies'):
+        for alias, declaration in section.get(category, {}).items():
+            resolved = declaration
+            if isinstance(declaration, dict) and declaration.get('workspace'):
+                resolved = workspace.get('workspace', {}).get('dependencies', {}).get(alias, {})
+            name = resolved.get('package', alias) if isinstance(resolved, dict) else alias
+            if name in forbidden:
+                errors.append(f'{protocol_manifest}: {category}.{alias}: forbidden dependency {name}')
+if errors:
+    sys.exit('\n'.join(errors))
+
+def cargo(*arguments):
+    command = ['cargo', *arguments, '--manifest-path', str(workspace_manifest)]
+    try:
+        completed = subprocess.run(command, cwd=root / 'rust', text=True,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   check=False)
+    except OSError as error:
+        sys.exit(f'{workspace_manifest}: cannot run cargo: {error}')
+    if completed.returncode:
+        sys.exit(f'{workspace_manifest}: {" ".join(command)} failed\n{completed.stderr}')
+    return completed.stdout
+
+# Check the displayed tree as well as metadata, including renamed/transitive deps.
+tree = cargo('tree', '-p', 'chatweave-protocol', '--all-features',
+             '--edges', 'normal,build,dev', '--prefix', 'none')
+for number, line in enumerate(tree.splitlines(), 1):
+    name = line.split(' ', 1)[0]
+    if name in forbidden:
+        errors.append(f'{protocol_manifest}: cargo tree line {number}: forbidden dependency {name}')
+
+try:
+    metadata = json.loads(cargo('metadata', '--format-version', '1', '--all-features'))
+    packages = {package['id']: package for package in metadata['packages']}
+    graph = {node['id']: node for node in metadata['resolve']['nodes']}
+    roots = [key for key, package in packages.items()
+             if package['name'] == 'chatweave-protocol'
+             and Path(package['manifest_path']).resolve() == protocol_manifest.resolve()]
+    if len(roots) != 1:
+        raise ValueError('expected exactly one protocol package')
+    pending, seen = roots[:], set()
+    while pending:
+        key = pending.pop()
+        if key in seen:
+            continue
+        seen.add(key)
+        name = packages[key]['name']
+        if name in forbidden:
+            errors.append(f'{protocol_manifest}: resolved dependency graph contains {name}')
+        pending.extend(graph[key]['dependencies'])
+except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+    sys.exit(f'{workspace_manifest}: invalid cargo metadata: {error}')
+if errors:
+    sys.exit('\n'.join(errors))
+print('Dependency boundaries passed (Dart sources, Cargo tree and resolved graph).')
+PY

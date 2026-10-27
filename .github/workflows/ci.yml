@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.99.1'
+          components: rustfmt, clippy
+      - name: Check formatting
+        working-directory: rust
+        run: cargo fmt --all --check
+      - name: Clippy (all targets and features)
+        working-directory: rust
+        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - name: Test without optional web integration
+        working-directory: rust
+        run: cargo test --locked --workspace
+      - name: Test with optional web integration
+        working-directory: rust
+        run: cargo test --locked --workspace --all-features
+      - name: Dependency boundaries
+        run: tool/check_deps
+      - name: Schema and conformance validation
+        run: tool/validate_schemas
+      - name: Vocabulary boundary
+        run: tool/check_host_terms
+      - name: Boundary negative controls
+        run: python3 -m unittest discover -s tool/tests -v
+
+  dart:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.8'
+          cache: true
+      - name: Resolve workspace
+        working-directory: dart
+        run: flutter pub get
+      - name: Check formatting
+        working-directory: dart
+        run: dart format --output=none --set-exit-if-changed .
+      - name: Analyze packages
+        working-directory: dart
+        run: dart analyze --fatal-infos
+      - name: Test pure Dart package
+        working-directory: dart/packages/chatweave_core
+        run: dart test
+      - name: Test Flutter package
+        working-directory: dart/packages/chatweave_flutter
+        run: flutter test

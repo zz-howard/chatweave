@@ -1,0 +1,19 @@
+{
+  "id": "msg_weather",
+  "protocolVersion": "0.1",
+  "conversationId": "conv_weather",
+  "role": "assistant",
+  "status": "complete",
+  "rev": 1,
+  "createdAt": "2026-10-26T09:30:00Z",
+  "fallbackText": "天气暂不可用",
+  "blocks": [
+    {
+      "id": "b1",
+      "type": "metric",
+      "schemaVersion": 1,
+      "status": "error",
+      "fallbackText": "天气暂不可用"
+    }
+  ]
+}

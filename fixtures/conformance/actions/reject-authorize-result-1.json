@@ -1,0 +1,8 @@
+{
+  "actionId": "action_0001",
+  "status": "rejected",
+  "error": {
+    "code": "forbidden",
+    "message": "请求被拒绝"
+  }
+}

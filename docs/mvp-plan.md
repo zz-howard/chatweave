@@ -1,6 +1,6 @@
 # MVP 实施计划（草案）
 
-> **状态：草案。** 对应 [architecture.md](architecture.md#7-分期) 的 Phase 1。每个任务都能独立实现、独立测试；验收标准写成机器能检查的形式为主。
+> **状态：T0–T4 已实现，构建机验收待验证；T5–T11 为后续计划。** 对应 [architecture.md](architecture.md#7-分期) 的 Phase 1。每个任务都能独立实现、独立测试；验收标准写成机器能检查的形式为主。
 
 ## 0. 端到端验收场景（MVP 完成的标志）
 
@@ -45,7 +45,7 @@ T0 ─┬─ T1 ─┬─ T2 ─┬─ T3 ─┐
 - **主要模块**：`docs/protocol.md`、`schemas/v0.1/`、`fixtures/conformance/`。
 - **依赖**：T0。
 - **产物**：每个内置类型的正例 / 反例；至少 20 个事件流夹具（`*.events.jsonl` + `*.expected.json`），覆盖：纯文本、混排、占位后填充、块失败、中断、用户停止、重复事件、跳号、快照、补丁与 `rev`、未知块类型、未知事件类型、穿插临时进度事件（折叠结果与不含它们时相同）、超限；运行步骤夹具：并行步骤、步骤失败（其他步骤与回答不受影响）、步骤运行中用户停止（`cancelled` 在 `message.end` 之前）、步骤运行中断线续传（从步骤中间的 `seq` 重放）、步骤运行中拿到快照（快照含 `running` 的步骤，之后收到它的 `step.finished`）、崩溃恢复（运行中的步骤记为 `failed`）、步骤事件对旧客户端（按未知事件忽略，正文折叠结果相同）；嵌套步骤（子 Agent 并行、3 层嵌套）；中断夹具：暂停（检查点 = `fold` 到 `message.paused`）、回答后继续（`block.patch` → `message.resumed` → 步骤结束，最终消息 `complete`）、继续之后断线续传、暂停期间日志过期后拿快照再继续、暂停中停止、中断过期、子 Agent 里的中断、同一条消息两次暂停；反例：重复的 `stepId`、对未开始的步骤发 `step.finished`、已结束消息里有 `running` 或 `awaiting_user` 的步骤、`awaiting_user` 不带 `blockId`、步骤事件不带 `seq`、`parentStepId` 指向不存在 / 非委派 / 已结束的步骤或自己、嵌套超过 3 层、委派步骤先于子步骤结束、暂停时还有块没结束或别的步骤在运行、暂停中出现中断块以外的事件、`message.resumed` 前块不是 `resolved`、`interruptId` 不一致、`paused` 消息缺 `interrupt` 或 `lastSeq`；另有动作夹具：正常回答、先答者胜（后到者拿到 `already_resolved` + 当前状态）、过期、被取代、服务端作废（`cancelled` + `reason`）、回答中断（`accepted` + `resume`，没有补丁）、中断的文字回答（`choice.select {freeText}`）、中断已被另一台设备回答（`already_resolved` + `resume`）；生成控制夹具：开始（重复提交返回同一个助手消息 ID）、停止、活动消息查询。
-- **验收**：`tool/validate_schemas` 通过（正例全部通过 Schema、反例全部被拒）；夹具的期望消息全部通过 `message.schema.json`。
+- **验收**：`tool/validate_schemas` 通过（生产正例全部通过 Schema；消费方未知类型夹具按宽进模式处理；反例按 manifest 的 `schema` / `semantic` / `limits` 层全部被拒，跨事件顺序与引用不要求单事件 Schema 表达）；夹具的期望消息全部通过 `message.schema.json`。
 
 ### T2 Rust：`chatweave-protocol`
 
@@ -69,7 +69,7 @@ T0 ─┬─ T1 ─┬─ T2 ─┬─ T3 ─┐
 - **主要模块**：`chatweave-server::action`。
 - **依赖**：T2。
 - **产物**：`ActionHandler<Ctx>`、`ActionStore<Ctx>`、`ActionRegistry::dispatch()`；内存版 `ActionStore`。
-- **验收**：中断块的回答返回 `accepted` + `resume`、不加 `rev`，重复动作 ID 不会让运行继续两次；单元测试覆盖 protocol.md 5.2 的每一步各自的拒绝路径（未声明、target 不符、已回答、过期、被取代、选项不在列表、表单越界、破坏性非确认、重复 ID 回放、`authorize` 拒绝）；非 `open` 的拒绝都带当前状态的补丁；并发的两个不同答案只有一个成功；成功路径返回补丁且 `rev` +1。
+- **验收**：中断块的回答返回 `accepted` + `resume`、不加 `rev`；cancel / freeText 回答不得调用破坏性执行处理器；同 ID 不同请求绑定被拒，相同 ID 在当前 authorize 通过后才回放，重复动作 ID 不会让运行继续两次；单元测试覆盖 protocol.md 5.2 的每一步各自的拒绝路径（未声明、target 不符、已回答、过期、被取代、选项不在列表、表单越界、破坏性非确认、重复 ID 回放、`authorize` 拒绝）；非 `open` 的拒绝都带当前状态的补丁；并发的两个不同答案只有一个成功；成功路径返回补丁且 `rev` +1。
 
 ### T5 Dart：`chatweave_core`
 

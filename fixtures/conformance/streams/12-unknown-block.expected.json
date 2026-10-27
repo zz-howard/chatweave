@@ -1,0 +1,22 @@
+{
+  "id": "msg_weather",
+  "protocolVersion": "0.1",
+  "conversationId": "conv_weather",
+  "role": "assistant",
+  "status": "complete",
+  "rev": 1,
+  "createdAt": "2026-10-26T09:30:00Z",
+  "fallbackText": "待办：浇花",
+  "blocks": [
+    {
+      "id": "b1",
+      "type": "x-todo.task_card",
+      "schemaVersion": 1,
+      "data": {
+        "taskId": "todo_1",
+        "titleSnapshot": "浇花"
+      },
+      "fallbackText": "待办：浇花"
+    }
+  ]
+}

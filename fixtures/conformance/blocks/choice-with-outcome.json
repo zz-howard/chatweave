@@ -1,0 +1,29 @@
+{
+  "id": "b1",
+  "type": "choice",
+  "schemaVersion": 1,
+  "data": {
+    "prompt": "查哪个城市？",
+    "options": [
+      {
+        "id": "bj",
+        "label": "北京"
+      },
+      {
+        "id": "sh",
+        "label": "上海"
+      }
+    ],
+    "selection": "single",
+    "action": {
+      "type": "choice.select",
+      "target": "weather.select"
+    },
+    "state": {
+      "status": "resolved",
+      "outcome": "confirm",
+      "resolvedAt": "2026-10-26T09:31:00Z"
+    }
+  },
+  "fallbackText": "请选择北京或上海"
+}

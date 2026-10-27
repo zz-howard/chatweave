@@ -1,0 +1,25 @@
+{
+  "actionId": "action_0001",
+  "status": "accepted",
+  "resume": {
+    "messageId": "msg_weather"
+  },
+  "patches": [
+    {
+      "messageId": "msg_weather",
+      "blockId": "b1",
+      "rev": 2,
+      "patch": {
+        "data": {
+          "state": {
+            "status": "resolved",
+            "selected": [
+              "bj"
+            ],
+            "resolvedAt": "2026-10-26T09:31:00Z"
+          }
+        }
+      }
+    }
+  ]
+}

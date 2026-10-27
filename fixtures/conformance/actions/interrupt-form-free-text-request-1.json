@@ -1,0 +1,14 @@
+{
+  "id": "action_0001",
+  "protocolVersion": "0.1",
+  "type": "form.submit",
+  "target": "todo.create",
+  "context": {
+    "conversationId": "conv_weather",
+    "messageId": "msg_weather",
+    "blockId": "b1"
+  },
+  "payload": {
+    "freeText": "明天浇花"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "protocolVersion": "0.1",
+  "messageId": "msg_weather",
+  "seq": 1,
+  "type": "block.patch",
+  "blockId": "b1",
+  "patch": {
+    "metadata": null,
+    "fallbackText": null
+  }
+}

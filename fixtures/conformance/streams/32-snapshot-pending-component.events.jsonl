@@ -1,0 +1,4 @@
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"message.snapshot","message":{"id":"msg_weather","protocolVersion":"0.1","conversationId":"conv_weather","role":"assistant","status":"streaming","rev":0,"createdAt":"2026-10-26T09:30:00Z","fallbackText":"","blocks":[{"id":"b1","type":"metric","schemaVersion":1,"status":"pending","fallbackText":""}],"lastSeq":2},"seq":2}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.data","blockId":"b1","data":{"label":"最高气温","value":18,"unit":"°C"},"fallbackText":"最高气温18°C","seq":3}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.end","blockId":"b1","status":"complete","seq":4}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"message.end","status":"complete","fallbackText":"最高气温18°C","blockCount":1,"rev":1,"seq":5}

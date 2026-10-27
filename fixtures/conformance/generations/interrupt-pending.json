@@ -1,0 +1,11 @@
+{
+  "userMessageId": "user_0001",
+  "error": {
+    "code": "interrupt_pending",
+    "message": "先回答上面的问题。"
+  },
+  "pending": {
+    "messageId": "msg_weather",
+    "interruptId": "int_1"
+  }
+}

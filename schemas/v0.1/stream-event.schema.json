@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/zz-howard/chatweave/schemas/v0.1/stream-event.schema.json",
-  "title": "ChatWeave Stream Event (draft 0.1)",
-  "description": "DRAFT. One event of a per-message block stream. Transport-neutral; the SSE binding puts seq in the SSE 'id' field and the JSON below in 'data'. (messageId, seq) is unique: consumers drop events with seq <= last applied seq and reconnect on gaps. Consumers ignore unknown event types (but still advance seq). Exception: message.activity is a transient, display-only event without seq; it is never logged, replayed, folded or persisted, and its SSE frame has no 'id' line. Run step events (step.started / step.finished, aligned with AG-UI 1.0 STEP_STARTED / STEP_FINISHED, see docs/protocol.md 4.7 and 10.1) are ordinary sequenced events: logged, replayed, folded into message.steps and included in snapshots. message.paused / message.resumed (aligned with AG-UI 1.0 RUN_FINISHED outcome 'interrupt' and the resuming run, see docs/protocol.md 4.8) pause and resume the same message: seq continues across the pause, and the server closes the stream after message.paused.",
+  "title": "ChatWeave Stream Event (0.1)",
+  "description": "One event of a per-message block stream. Transport-neutral; the SSE binding puts seq in the SSE 'id' field and the JSON below in 'data'. (messageId, seq) is unique: consumers drop events with seq <= last applied seq and reconnect on gaps. Consumers ignore unknown event types (but still advance seq). Exception: message.activity is a transient, display-only event without seq; it is never logged, replayed, folded or persisted, and its SSE frame has no 'id' line. Run step events (step.started / step.finished, aligned with AG-UI 1.0 STEP_STARTED / STEP_FINISHED, see docs/protocol.md 4.7 and 10.1) are ordinary sequenced events: logged, replayed, folded into message.steps and included in snapshots. message.paused / message.resumed (aligned with AG-UI 1.0 RUN_FINISHED outcome 'interrupt' and the resuming run, see docs/protocol.md 4.8) pause and resume the same message: seq continues across the pause, and the server closes the stream after message.paused.",
   "type": "object",
   "required": ["protocolVersion", "type", "messageId"],
   "properties": {
@@ -173,14 +173,14 @@
       "properties": {
         "type": { "const": "block.patch" },
         "blockId": { "$ref": "#/$defs/blockId" },
-        "rev": { "type": "integer", "minimum": 2 },
+        "rev": { "type": "integer", "minimum": 1 },
         "patch": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "data": { "type": "object" },
-            "fallbackText": { "type": "string", "maxLength": 2000 },
-            "metadata": { "type": "object" }
+            "data": { "type": ["object", "null"] },
+            "fallbackText": { "type": ["string", "null"], "maxLength": 2000 },
+            "metadata": { "type": ["object", "null"] }
           }
         }
       }

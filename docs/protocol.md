@@ -1,6 +1,6 @@
-# ChatWeave 协议规范（草案 0.1）
+# ChatWeave 协议规范（0.1）
 
-> **状态：草案。** 本文是 ChatWeave 的语言无关协议说明，机器可读的定义在 [`schemas/v0.1/`](../schemas/v0.1/)（JSON Schema draft 2020-12）。两者不一致时以 Schema 为准，并当作缺陷修正。0.x 期间的小版本升级**可能**含破坏性变化，1.0 之后遵守语义化版本。
+> **状态：0.1 定稿。** 本文是 ChatWeave 的语言无关协议说明，机器可读的定义在 [`schemas/v0.1/`](../schemas/v0.1/)（JSON Schema draft 2020-12）。两者不一致时以 Schema 为准，并当作缺陷修正。0.x 期间的小版本升级**可能**含破坏性变化，1.0 之后遵守语义化版本。
 
 本文中的关键词“必须 / 不得 / 应当 / 可以”分别对应 RFC 2119 的 MUST / MUST NOT / SHOULD / MAY。
 
@@ -88,9 +88,13 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 | `id` | ✅ | 稳定块 ID |
 | `type` | ✅ | 语义类型：内置类型（3.2）或宿主自定义类型（3.3） |
 | `schemaVersion` | ✅ | 该类型 `data` 结构的版本（整数）。只新增可选字段不升版；含义变化或破坏性变化必须升版 |
-| `data` | ✅ | 内容主体，结构由类型决定 |
-| `fallbackText` | 非 markdown 块必填 | 本块的纯文本版本 |
+| `data` | 完成块必填 | 内容主体，结构由类型决定；`pending` / `error` 可省略 |
+| `status` | | 块生命周期：省略等同 `complete`；`pending` 表示尚未收到 `block.end`，即使完整 `data` 已到达；`error` 保留原类型并显示兜底。它与交互块的 `data.state.status` 无关 |
+| `reason` | | 仅 `status: error` 时可带的简短安全错误说明，最多 500 字符 |
+| `fallbackText` | 非 markdown 块和 `pending` / `error` 块必填 | 本块的纯文本版本；占位时允许空字符串 |
 | `metadata` | | `provenance`（事实来源：`model` 模型 / `tool` 工具结果 / `host` 宿主业务数据 / `adapter` 适配器）、`asOf`（数据时点）、`citations`（引用来源）、`host`（宿主不透明扩展） |
+
+检查点和快照必须保留块生命周期。`block.start` 创建 `pending` 块（markdown 可带 `{text: ""}`，组件尚无 `data`），`block.data` 到达后仍为 `pending`；`block.end{complete}` 去掉 `status`，`block.end{error}` 写 `status: error`、兜底和可选的短错误说明。失败块不得伪造业务数据、改类型或移除。暂停及最终消息不得含 `pending` 块；生成中快照可以含它们，恢复后照常接收后续 data/delta/end。
 
 ### 3.1 语义与表现分离
 
@@ -251,7 +255,7 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 
 ### 3.3 宿主自定义类型
 
-宿主可以定义自己的业务类型，**必须带命名空间**：`x-<宿主名>.<类型名>`，例如 `x-jiabu.record_card`、`x-todo.task_card`。规则：
+宿主可以定义自己的业务类型，**必须带命名空间**：`x-<宿主名>.<类型名>`，例如 `x-todo.task_card`。规则：
 
 1. 宿主必须在服务端为每个自定义类型注册 JSON Schema，并在发出前校验（库提供注册接口）；通用 Schema 只约束大小。
 2. 宿主必须在客户端注册对应组件；没注册的客户端按未知类型降级。
@@ -260,7 +264,7 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 
 ### 3.4 交互块的状态（`choice` / `confirmation` / `form_intent`）
 
-交互块的 `state` **只由服务端写**，并且只在服务端已经记录了结果之后才变化：
+交互块的 `state` **只由服务端写**，并且只在服务端已经记录了结果之后才变化。省略 `state` 等同 `{status: "open"}`。`resolved` 必须恰好有一个适合本块的答案字段（choice：`selected` / `freeText`；confirmation：`outcome` / `freeText`；form_intent：`values` / `freeText`）及 `resolvedAt`；其他状态不得带答案、`resolvedAt` 或 `resolvedBy`。`superseded` 必须有 `supersededBy`，其他状态不得带它：
 
 | `state.status` | 含义 | 客户端显示 |
 |---|---|---|
@@ -307,7 +311,7 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 | `block.data` | `blockId`、`data`、`fallbackText`、`metadata?` | 组件块的**完整**数据（服务端已校验），v1 每块只发一次 |
 | `block.patch` | `blockId`、`patch`、`rev?` | 按块 ID 局部更新：对 `{data, fallbackText, metadata}` 做 JSON Merge Patch |
 | `block.end` | `blockId`、`status`（`complete`/`error`）、`fallbackText?`、`error?` | 块结束；组件块失败时给出兜底文本 |
-| `message.end` | `status`、`fallbackText`、`blockCount`、`rev`、`error?` | 消息结束，最终版本已持久化 |
+| `message.end` | `status`、`fallbackText`、`blockCount`、`rev`、`error?` | 消息结束，最终版本已持久化；有 `ts` 时折叠为 `completedAt`，否则省略，折叠不得读取当前时钟 |
 | `message.paused` | `interrupt{id, stepId, blockId, reason}`、`fallbackText`、`blockCount` | 运行在等用户回答（中断），消息暂停；服务端持久化暂停检查点后关闭流（4.8）。对应 AG-UI 的 `RUN_FINISHED{outcome: interrupt}` |
 | `message.resumed` | `interruptId` | 中断已被回答，同一条消息继续（4.8）。对应 AG-UI 带 `resume` 的新一次运行的 `RUN_STARTED` |
 | `message.snapshot` | `message`（完整消息） | 续传时无法按序重放、或服务端不保留事件日志时，直接发完整状态 |
@@ -519,25 +523,25 @@ streaming ──message.paused──▶ paused ──(回答) block.patch + mess
    }
    ```
    - `status`：`completed`（同步完成）/ `accepted`（已受理，异步执行，例如回答了中断、运行即将继续，或重新排队一轮 Agent）/ `rejected`（校验、权限或状态不符，原样重试无意义）/ `failed`（执行出错，看 `error.retryable`）。
-   - `error.code`：`invalid_payload`、`not_found`、`forbidden`、`already_resolved`、`expired`、`superseded`、`confirmation_required`、`target_mismatch`、`conflict`、`rate_limited`、`unavailable`、`unsupported`、`internal`。宿主可以把“无权限”也报成 `not_found`，以免泄露资源存在。几个容易混淆的：
+   - `error.code`：`invalid_request`、`invalid_payload`、`not_found`、`forbidden`、`already_resolved`、`expired`、`superseded`、`confirmation_required`、`target_mismatch`、`conflict`、`rate_limited`、`unavailable`、`unsupported`、`internal`。宿主可以把“无权限”也报成 `not_found`，以免泄露资源存在。几个容易混淆的：
      - `forbidden`：**这个人**不能回答这个块；`conflict`：**业务规则**不允许这次操作（例如状态已变化）。两者给用户的提示不同。
      - `already_resolved` / `expired` / `superseded`：块已经不是 `open`。结果**必须**带 `patches`，把块更新成服务端的真实状态；块所在的消息还没结束时（中断的块）改为带 `resume`，客户端从那条消息的流或快照拿真实状态（4.8）。
      - `unavailable`：服务端暂时无法给出结论，**动作可能已经执行**。客户端不得把它显示成“失败”，而是显示“暂时无法确认结果”，刷新块状态，必要时用**同一个 ID** 重试。客户端自己的超时同理。
-   - `patches`：块状态变化，与流里的 `block.patch` 同形；同步下来的持久化版本 `rev` 相同，重复应用无副作用。客户端只根据 `patches`（或同步版本）显示结果。
+   - `patches`：块状态变化，与流里的 `block.patch` 同形；拒绝所附当前状态可以是 `rev = 1`（中断已经在首次持久化前回答 / 关闭），成功修改仍须 `rev + 1`；同步下来的持久化版本 `rev` 相同，重复应用无副作用。客户端只根据 `patches`（或同步版本）显示结果。
    - `resume`：动作回答了一条暂停中的消息的中断，**同一条消息**继续；客户端按已应用的 `seq` 重新订阅它的流（4.8）。这时没有 `patches`，答案作为流里的 `block.patch` 到达。
    - `followUp`：动作引发了一条新的助手消息时给出其 ID，客户端可以去订阅它的流（块在一条已经结束的消息里时）。`resume` 和 `followUp` 不会同时出现。
 
 ### 5.2 服务端处理顺序（库的 dispatcher 固定执行）
 
-1. 按 `context.messageId` / `blockId` **从宿主存储加载持久化的块**（宿主的加载函数同时做作用域校验，查不到即 `not_found`）。
+1. 按 `context.messageId` / `blockId` **从宿主存储加载持久化的块**（宿主的加载函数同时做作用域校验，查不到即 `not_found`）。同时只检查这个作用域内的动作 ID 绑定：绑定规范化请求（作用域、消息 / 块、`type`、`target`、`payload`；对象键排序，忽略 `clientTs`）的指纹。已有 ID 与绑定不符即 `invalid_request`，不得泄露已保存结果；绑定一致只标记“待回放”，跳过第 2–4 步的状态与新请求校验，仍必须执行第 5 步。结果本身只在第 6 步读取和返回。
 2. 块里必须声明了 ActionSpec，且 `type`、`target` 与请求一致（否则 `target_mismatch`）；块状态必须是 `open`（否则按当前状态返回 `already_resolved` / `superseded`，并附上当前状态的补丁），未过期（否则 `expired`，同样附上补丁）。
 3. **按块自身的声明校验 payload**：选的选项必须在 `options` 里、数量符合 `selection` / `minSelect` / `maxSelect`；表单值必须满足字段的类型、必填、范围、长度、选项。客户端无法提交块里没出现过的值。`freeText` 只在块是一个开着的中断的块、且该中断的 `otherInput` 不为 `false` 时接受（否则 `invalid_payload`），长度 1–500 字符，原样交给宿主，不做语义校验。
-4. 处理器标记为破坏性时，请求必须来自 `severity: destructive` 的确认块，且 `outcome = confirm`（否则 `confirmation_required`）。
+4. 处理器标记为破坏性时，真正执行操作的请求必须来自 `severity: destructive` 的确认块，且 `outcome = confirm`（否则 `confirmation_required`）。中断块的 `cancel` 或允许的 `freeText` 只记录中断回答，不执行破坏性处理器；它们仍经第 5 步授权，之后仅提交答案并继续运行。
 5. 调用宿主处理器的 `authorize`（宿主自己的权限检查）。无权即拒绝，即使这个 `id` 之前已有结果也不回放——权限可能已经变了（例如请求者已离开会话），回放旧结果会把数据交给已经无权的人。
-6. 幂等检查：同一个 `id` 已有结果则直接返回（`replayed: true`）；否则调用 `execute`。
+6. 幂等检查：第 1 步匹配的同一个 `id` 已有结果则返回（`replayed: true`）；否则调用 `execute`（中断的非执行回答只记录答案，不调用破坏性 `execute`）。
 7. 写入块的新状态（`rev + 1`），返回结果与补丁。块是暂停中的消息的中断块时不同：不加 `rev`，答案作为这条消息流里的 `block.patch` 发出，把答案交给宿主的 Agent 运行时继续这一轮，返回 `accepted` + `resume`（4.8 第 11 条）。
 
-第 2 步与第 7 步必须在同一个事务（或等价的条件写入）里完成“检查仍为 `open` → 写入结果”，这样并发的两个答案只有一个能成功，另一个拿到 `already_resolved`。
+第 2 步与第 7 步必须在同一个事务（或等价的条件写入）里完成“检查仍为 `open` → 写入结果”，这样并发的两个答案只有一个能成功，另一个拿到 `already_resolved`。事务 / 按块保留权必须覆盖第 6 步执行，不能等执行后仅对结果做 CAS，否则两个请求的业务副作用可能都已发生。内存实现可以按块锁串行执行；持久实现由宿主提供等价事务、保留权与执行幂等保障。相同 ID 的重试仍执行当前 `authorize`；即使块已经解决也不能在授权之前返回旧结果。
 
 **UI 动作 ≠ 工具授权**：一个块里出现了按钮，只代表“允许用户发起这个请求”，不代表请求一定被执行；执行与否由第 3、4、5 步决定。模型生成的内容永远无法直接获得工具执行权限。
 
@@ -553,7 +557,7 @@ streaming ──message.paused──▶ paused ──(回答) block.patch + mess
 
 消费方按以下顺序处理每个块（每个块单独处理，一个块失败不影响其他块）：
 
-1. 类型已注册且 `schemaVersion ≤ 支持的最高版本`，解析成功 → 渲染组件。
+1. `pending` 显示占位，`error` 直接显示兜底；完成块类型已注册且 `schemaVersion ≤ 支持的最高版本`，解析成功 → 渲染组件。
 2. 内置的“降级链”可用（例如 `time_series` 不支持图表时转表格）→ 渲染降级组件。
 3. 否则（包括组件在构建或渲染时出错）→ 渲染该块的 `fallbackText`（markdown 块没有 `fallbackText`，其文本本身就是兜底）。
 4. 连 `fallbackText` 也缺失（不合规的生产方）→ 显示一行中性的“此内容无法显示”。
@@ -617,11 +621,11 @@ ChatWeave-Protocol: 0.1
 | 项 | 上限（协议默认） |
 |---|---|
 | 每条消息的块数 | 64 |
-| 单块 `data` 序列化后大小 | 64 KB |
-| 整条消息序列化后大小 | 256 KB |
-| markdown 块文本 | 32 KB（32768 字符） |
-| 单个 `block.delta` 文本 | 4 KB |
-| 单个流事件 | 128 KB |
+| 单块 `data` 序列化后大小 | 64 KiB（65,536 UTF-8 字节） |
+| 整条消息序列化后大小 | 256 KiB（262,144 UTF-8 字节） |
+| markdown 块文本 | 32 KiB UTF-8 字节，且最多 32,768 个 Unicode 字符 |
+| 单个 `block.delta` 文本 | 4 KiB UTF-8 字节，且最多 4,096 个 Unicode 字符 |
+| 单个流事件 | 128 KiB（131,072 UTF-8 字节） |
 | `data` 内 JSON 嵌套深度 | 6 层（以 `data` 为第 1 层） |
 | 单块 JSON 节点总数（对象 + 数组 + 标量） | 5,000 |
 | `metric_group.metrics` | 12 |
@@ -637,6 +641,8 @@ ChatWeave-Protocol: 0.1
 | 步骤 `label` / `summary` | 60 / 120 字符 |
 | 每次暂停等待的中断 | 1 |
 | 动作的 `freeText`（三种动作） | 500 字符 |
+
+每条消息最多 5,000 个带序号的事件；生产方须预留停止 / 失败时关闭块、步骤及消息所需的事件额度。
 
 数量与长度上限写在 Schema 里；字节大小、深度、节点数由库的 `Limits` 校验（Schema 难以表达）。宿主可以把限制**调得更严**，不能调得比协议默认更宽（否则别的消费方可能拒收）。超限时生产方必须截断（并填 `totalRows` 之类的说明）或改发 markdown，不得发出超限块。
 

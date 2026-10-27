@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/zz-howard/chatweave/schemas/v0.1/content-block.schema.json",
-  "title": "ChatWeave Content Block (draft 0.1)",
-  "description": "DRAFT. One semantic content block inside a message. Blocks describe WHAT to express (facts, semantics), never HOW to draw it (colors, sizes, layout). Producers (servers) validate strictly against this schema; consumers (clients) parse leniently, ignore unknown fields and fall back to fallbackText for anything they cannot render.",
+  "title": "ChatWeave Content Block (0.1)",
+  "description": "One semantic content block inside a message. Blocks describe WHAT to express (facts, semantics), never HOW to draw it (colors, sizes, layout). Producers (servers) validate strictly against this schema; consumers (clients) parse leniently, ignore unknown fields and fall back to fallbackText for anything they cannot render.",
   "type": "object",
-  "required": ["id", "type", "schemaVersion", "data"],
+  "required": ["id", "type", "schemaVersion"],
   "additionalProperties": false,
   "properties": {
     "id": { "$ref": "#/$defs/blockId" },
@@ -21,7 +21,22 @@
       "type": "string",
       "maxLength": 2000
     },
-    "metadata": { "$ref": "#/$defs/blockMetadata" }
+    "metadata": { "$ref": "#/$defs/blockMetadata" },
+    "status": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "pending",
+        "error"
+      ],
+      "default": "complete",
+      "description": "Block lifecycle. Omitted means complete; pending means block.end has not arrived, even if data is already present. Error retains the original block type and fallbackText."
+    },
+    "reason": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Optional safe, short explanation of a failed block."
+    }
   },
   "allOf": [
     {
@@ -71,6 +86,76 @@
     {
       "if": { "properties": { "type": { "pattern": "^x-" } } },
       "then": { "properties": { "data": { "$ref": "#/$defs/customData" } } }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "pending",
+              "error"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "fallbackText"
+        ]
+      },
+      "else": {
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "error"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "reason"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "metadata": {
+            "properties": {
+              "provenance": {
+                "const": "adapter"
+              }
+            },
+            "required": [
+              "provenance"
+            ]
+          }
+        },
+        "required": [
+          "metadata"
+        ]
+      },
+      "then": {
+        "properties": {
+          "type": {
+            "const": "markdown"
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -84,7 +169,7 @@
       "pattern": "^[a-z][a-z0-9_]{0,31}$"
     },
     "blockType": {
-      "description": "Built-in semantic type, or a host-defined custom type namespaced as x-<host>.<name>, e.g. x-jiabu.record_card. Custom record-like types should carry the record id plus an optional display-only title snapshot (shown only when the record cannot be read locally); the id is the source of truth.",
+      "description": "Built-in semantic type, or a host-defined custom type namespaced as x-<host>.<name>, e.g. x-todo.task_card. Custom record-like types should carry the record id plus an optional display-only title snapshot (shown only when the record cannot be read locally); the id is the source of truth.",
       "anyOf": [
         {
           "type": "string",
@@ -197,12 +282,17 @@
         "selected": {
           "type": "array",
           "maxItems": 10,
-          "items": { "type": "string", "maxLength": 64 }
+          "items": {
+            "$ref": "action.schema.json#/$defs/optionId"
+          },
+          "minItems": 1,
+          "uniqueItems": true
         },
         "freeText": {
           "description": "Set by the server when the block was answered with text instead of its own controls: through the block's action with {freeText} when the block belongs to an open interrupt (any interactive type, via the card's 'other input' entry, D60), or, for a choice in a message that has ended, with a normal user message (D22).",
           "type": "string",
-          "maxLength": 500
+          "maxLength": 500,
+          "minLength": 1
         },
         "outcome": { "type": "string", "enum": ["confirm", "cancel"] },
         "values": { "type": "object", "maxProperties": 12 },
@@ -253,6 +343,178 @@
         {
           "if": { "properties": { "status": { "enum": ["open", "resolved"] } }, "required": ["status"] },
           "then": { "not": { "required": ["reason"] } }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "resolved"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "oneOf": [
+              {
+                "required": [
+                  "selected"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "outcome"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "values"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "freeText"
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "outcome"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "selected"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "values"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "freeText"
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "values"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "selected"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "outcome"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "freeText"
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "freeText"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "selected"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "outcome"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "values"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "selected"
+                  ]
+                },
+                {
+                  "required": [
+                    "outcome"
+                  ]
+                },
+                {
+                  "required": [
+                    "values"
+                  ]
+                },
+                {
+                  "required": [
+                    "freeText"
+                  ]
+                },
+                {
+                  "required": [
+                    "resolvedAt"
+                  ]
+                },
+                {
+                  "required": [
+                    "resolvedBy"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "superseded"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "supersededBy"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "supersededBy"
+              ]
+            }
+          }
         }
       ]
     },
@@ -531,7 +793,29 @@
           ]
         },
         "state": { "$ref": "#/$defs/blockState" }
-      }
+      },
+      "allOf": [
+        {
+          "properties": {
+            "state": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "outcome"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "values"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
     },
     "confirmationData": {
       "type": "object",
@@ -571,7 +855,29 @@
       },
       "then": {
         "properties": { "severity": { "const": "destructive" } }
-      }
+      },
+      "allOf": [
+        {
+          "properties": {
+            "state": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "selected"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "values"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
     },
     "formField": {
       "type": "object",
@@ -632,7 +938,29 @@
           ]
         },
         "state": { "$ref": "#/$defs/blockState" }
-      }
+      },
+      "allOf": [
+        {
+          "properties": {
+            "state": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "selected"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "outcome"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
     },
     "customData": {
       "description": "Host-defined data. The host MUST register a JSON Schema for each custom type on the server and validate against it; this generic shape only enforces size limits.",

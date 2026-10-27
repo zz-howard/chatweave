@@ -1,0 +1,8 @@
+{
+  "id": "b1",
+  "type": "metric",
+  "schemaVersion": 1,
+  "status": "error",
+  "reason": "天气服务暂时不可用",
+  "fallbackText": "暂无天气"
+}

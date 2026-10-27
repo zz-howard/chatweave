@@ -1,0 +1,11 @@
+{
+  "protocolVersions": [
+    "0.1"
+  ],
+  "blocks": {
+    "markdown": 1
+  },
+  "features": [
+    "stream.activity"
+  ]
+}

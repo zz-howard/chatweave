@@ -1,0 +1,532 @@
+{
+  "id": "msg_weather",
+  "protocolVersion": "0.1",
+  "conversationId": "conv_weather",
+  "role": "assistant",
+  "status": "complete",
+  "rev": 1,
+  "createdAt": "2026-10-26T09:30:00Z",
+  "fallbackText": "天气晴朗。",
+  "blocks": [
+    {
+      "id": "b0",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b1",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b2",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b3",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b4",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b5",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b6",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b7",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b8",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b9",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b10",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b11",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b12",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b13",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b14",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b15",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b16",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b17",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b18",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b19",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b20",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b21",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b22",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b23",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b24",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b25",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b26",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b27",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b28",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b29",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b30",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b31",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b32",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b33",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b34",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b35",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b36",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b37",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b38",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b39",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b40",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b41",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b42",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b43",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b44",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b45",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b46",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b47",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b48",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b49",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b50",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b51",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b52",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b53",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b54",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b55",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b56",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b57",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b58",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b59",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b60",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b61",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b62",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b63",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    },
+    {
+      "id": "b64",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"message.start","message":{"id":"msg_weather","role":"assistant","conversationId":"conv_weather","createdAt":"2026-10-26T09:30:00Z"},"seq":1}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.start","blockId":"b1","index":0,"blockType":"markdown","schemaVersion":1,"seq":2}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.delta","blockId":"b1","delta":{"text":"天气晴朗。"},"seq":3}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.end","blockId":"b1","status":"complete","seq":4}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.start","blockId":"b2","index":1,"blockType":"metric","schemaVersion":1,"seq":5}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.data","blockId":"b2","data":{"label":"最高气温","value":18,"unit":"°C"},"fallbackText":"最高气温18°C","seq":6}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.end","blockId":"b2","status":"complete","seq":7}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.start","blockId":"b3","index":2,"blockType":"dataset","schemaVersion":1,"seq":8}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.data","blockId":"b3","data":{"columns":[{"key":"title","label":"事项","type":"string"}],"rows":[{"title":"浇花"}],"totalRows":1},"fallbackText":"待办：浇花","seq":9}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.end","blockId":"b3","status":"complete","seq":10}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.start","blockId":"b4","index":3,"blockType":"markdown","schemaVersion":1,"seq":11}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.delta","blockId":"b4","delta":{"text":"记得浇花。"},"seq":12}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.end","blockId":"b4","status":"complete","seq":13}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"message.end","status":"complete","fallbackText":"天气晴朗。最高气温18°C待办：浇花记得浇花。","blockCount":4,"rev":1,"seq":14}

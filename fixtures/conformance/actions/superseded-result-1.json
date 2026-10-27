@@ -1,0 +1,23 @@
+{
+  "actionId": "action_0001",
+  "status": "rejected",
+  "error": {
+    "code": "superseded",
+    "message": "问题已关闭"
+  },
+  "patches": [
+    {
+      "messageId": "msg_weather",
+      "blockId": "b1",
+      "rev": 2,
+      "patch": {
+        "data": {
+          "state": {
+            "status": "superseded",
+            "supersededBy": "b2"
+          }
+        }
+      }
+    }
+  ]
+}

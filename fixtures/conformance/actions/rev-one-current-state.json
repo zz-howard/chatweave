@@ -1,0 +1,26 @@
+{
+  "actionId": "action_0001",
+  "status": "rejected",
+  "error": {
+    "code": "already_resolved",
+    "message": "已回答"
+  },
+  "patches": [
+    {
+      "messageId": "msg_weather",
+      "blockId": "b1",
+      "rev": 1,
+      "patch": {
+        "data": {
+          "state": {
+            "status": "resolved",
+            "selected": [
+              "bj"
+            ],
+            "resolvedAt": "2026-10-26T09:31:00Z"
+          }
+        }
+      }
+    }
+  ]
+}

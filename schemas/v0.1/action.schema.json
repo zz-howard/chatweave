@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/zz-howard/chatweave/schemas/v0.1/action.schema.json",
-  "title": "ChatWeave Action (draft 0.1)",
-  "description": "DRAFT. Action protocol v1: the action spec declared inside an interactive block (server-authored), the action request sent by the client, and the action result returned by the server. Producers validate strictly; consumers parse leniently and ignore unknown fields.",
+  "title": "ChatWeave Action (0.1)",
+  "description": "Action protocol v1: the action spec declared inside an interactive block (server-authored), the action request sent by the client, and the action result returned by the server. Producers validate strictly; consumers parse leniently and ignore unknown fields.",
   "$defs": {
     "messageId": {
       "type": "string",
@@ -162,21 +162,7 @@
       "properties": {
         "code": {
           "type": "string",
-          "enum": [
-            "invalid_payload",
-            "not_found",
-            "forbidden",
-            "already_resolved",
-            "expired",
-            "confirmation_required",
-            "target_mismatch",
-            "superseded",
-            "conflict",
-            "rate_limited",
-            "unavailable",
-            "unsupported",
-            "internal"
-          ],
+          "enum": ["invalid_request", "invalid_payload", "not_found", "forbidden", "already_resolved", "expired", "confirmation_required", "target_mismatch", "superseded", "conflict", "rate_limited", "unavailable", "unsupported", "internal"],
           "description": "forbidden: this person may not answer this block. conflict: a business rule refused the operation. already_resolved / expired / superseded: the block is no longer open; the result carries patches with the server's actual state. unavailable: the outcome is unknown (the action may have run); clients must not present it as a failure and should refresh the block state, retrying with the same action id."
         },
         "message": {
@@ -201,15 +187,15 @@
       "properties": {
         "messageId": { "$ref": "#/$defs/messageId" },
         "blockId": { "$ref": "#/$defs/blockId" },
-        "rev": { "type": "integer", "minimum": 2 },
+        "rev": { "type": "integer", "minimum": 1 },
         "patch": {
           "description": "JSON Merge Patch (RFC 7396) applied to the block's {data, fallbackText, metadata}.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "data": { "type": "object" },
-            "fallbackText": { "type": "string", "maxLength": 2000 },
-            "metadata": { "type": "object" }
+            "data": { "type": ["object", "null"] },
+            "fallbackText": { "type": ["string", "null"], "maxLength": 2000 },
+            "metadata": { "type": ["object", "null"] }
           }
         }
       }
@@ -278,6 +264,14 @@
         {
           "$comment": "resume (same message continues) and followUp (new message) are mutually exclusive. A block of a message that has not ended has no rev yet: instead of patches, the result points at that message ('resume') and the client takes the current state from its stream or snapshot.",
           "not": { "required": ["resume", "followUp"] }
+        },
+        {
+          "not": {
+            "required": [
+              "resume",
+              "patches"
+            ]
+          }
         }
       ]
     }

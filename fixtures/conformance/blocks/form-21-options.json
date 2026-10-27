@@ -1,0 +1,109 @@
+{
+  "id": "b1",
+  "type": "form_intent",
+  "schemaVersion": 1,
+  "data": {
+    "title": "新建待办",
+    "fields": [
+      {
+        "key": "city",
+        "label": "城市",
+        "type": "single_select",
+        "options": [
+          {
+            "id": "option_0",
+            "label": "城市"
+          },
+          {
+            "id": "option_1",
+            "label": "城市"
+          },
+          {
+            "id": "option_2",
+            "label": "城市"
+          },
+          {
+            "id": "option_3",
+            "label": "城市"
+          },
+          {
+            "id": "option_4",
+            "label": "城市"
+          },
+          {
+            "id": "option_5",
+            "label": "城市"
+          },
+          {
+            "id": "option_6",
+            "label": "城市"
+          },
+          {
+            "id": "option_7",
+            "label": "城市"
+          },
+          {
+            "id": "option_8",
+            "label": "城市"
+          },
+          {
+            "id": "option_9",
+            "label": "城市"
+          },
+          {
+            "id": "option_10",
+            "label": "城市"
+          },
+          {
+            "id": "option_11",
+            "label": "城市"
+          },
+          {
+            "id": "option_12",
+            "label": "城市"
+          },
+          {
+            "id": "option_13",
+            "label": "城市"
+          },
+          {
+            "id": "option_14",
+            "label": "城市"
+          },
+          {
+            "id": "option_15",
+            "label": "城市"
+          },
+          {
+            "id": "option_16",
+            "label": "城市"
+          },
+          {
+            "id": "option_17",
+            "label": "城市"
+          },
+          {
+            "id": "option_18",
+            "label": "城市"
+          },
+          {
+            "id": "option_19",
+            "label": "城市"
+          },
+          {
+            "id": "option_20",
+            "label": "城市"
+          }
+        ]
+      }
+    ],
+    "action": {
+      "type": "form.submit",
+      "target": "todo.create"
+    },
+    "state": {
+      "status": "open"
+    }
+  },
+  "fallbackText": "填写事项和优先级"
+}

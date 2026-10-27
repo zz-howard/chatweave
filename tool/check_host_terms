@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'printf "%s:%s: vocabulary check failed\n" "${BASH_SOURCE[0]}" "$LINENO" >&2' ERR
+root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ ${1:-} == --root ]]; then
+  root="${2:?--root requires a directory}"
+  shift 2
+fi
+if (( $# )); then
+  printf 'usage: %s [--root DIRECTORY]\n' "$0" >&2
+  exit 2
+fi
+python3 - "$root" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+root = Path(sys.argv[1]).resolve()
+terms_file = root / 'tool/host_terms.txt'
+try:
+    terms = [line.strip() for line in terms_file.read_text().splitlines()
+             if line.strip() and not line.lstrip().startswith('#')]
+except OSError as error:
+    sys.exit(f'{terms_file}: {error}')
+if not terms:
+    sys.exit(f'{terms_file}: vocabulary must not be empty')
+patterns = [(term, re.compile(r'(?<![A-Za-z])' + re.escape(term) + r'(?![A-Za-z])', re.I)
+             if term.isascii() else re.compile(re.escape(term))) for term in terms]
+# Lockfiles and generated outputs describe third-party tools, not library sources.
+excluded_dirs = {'.git', '.dart_tool', 'target', 'build', 'node_modules', '__pycache__'}
+excluded_files = {'Cargo.lock', 'pubspec.lock', '.DS_Store'}
+errors, count = [], 0
+for directory in ('rust', 'dart/packages', 'schemas', 'examples'):
+    base = root / directory
+    if not base.exists():
+        continue
+    for path in sorted(base.rglob('*')):
+        if not path.is_file() or path.is_symlink() or path.name in excluded_files:
+            continue
+        if any(part in excluded_dirs for part in path.relative_to(base).parts):
+            continue
+        try:
+            content = path.read_text(encoding='utf-8')
+        except UnicodeDecodeError:
+            continue
+        count += 1
+        for number, line in enumerate(content.splitlines(), 1):
+            for term, pattern in patterns:
+                if pattern.search(line):
+                    errors.append(f'{path}:{number}: prohibited business term: {term}')
+if not count:
+    sys.exit(f'{root}: no library/schema/example source files checked')
+if errors:
+    sys.exit('\n'.join(errors))
+print(f'Vocabulary boundary passed ({count} source files).')
+PY

@@ -1,0 +1,7 @@
+{
+  "type": "step.started",
+  "stepId": "s1",
+  "label": "查天气",
+  "protocolVersion": "0.1",
+  "messageId": "msg_weather"
+}

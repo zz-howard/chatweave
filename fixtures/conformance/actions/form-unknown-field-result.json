@@ -1,0 +1,11 @@
+{
+  "actionId": "action_0001",
+  "status": "rejected",
+  "error": {
+    "code": "invalid_payload",
+    "message": "检查字段",
+    "fieldErrors": {
+      "priority": "不符合字段声明"
+    }
+  }
+}

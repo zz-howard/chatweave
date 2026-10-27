@@ -1,6 +1,6 @@
 # ChatWeave 架构（草案）
 
-> **状态：草案，设计阶段，尚无代码。** 协议细节见 [protocol.md](protocol.md)，流式细节见 [streaming.md](streaming.md)，渲染见 [rendering.md](rendering.md)。
+> **状态：CW1 Rust 核心（T0–T4）已实现，构建机验收待验证；Dart/Flutter 仅有空包骨架。** 协议细节见 [protocol.md](protocol.md)，流式细节见 [streaming.md](streaming.md)，渲染见 [rendering.md](rendering.md)。
 
 ## 1. 定位
 
@@ -124,7 +124,7 @@ Action Registry 的接口草图（未编译，示意）：
 pub trait ActionHandler<Ctx>: Send + Sync {
     fn target(&self) -> &'static str;                 // 例如 "todo.delete"
     fn accepts(&self) -> &'static [ActionType];       // 允许的动作类型
-    fn destructive(&self) -> bool { false }           // 破坏性：只接受破坏性确认块的 confirm
+    fn destructive(&self) -> bool { false }           // 真正执行只接受 destructive confirm；中断 cancel/freeText 只记录答案
     async fn authorize(&self, ctx: &Ctx, action: &ResolvedAction) -> Result<(), ActionError>;
     async fn execute(&self, ctx: &Ctx, action: ResolvedAction) -> Result<ActionOutcome, ActionError>;
 }
@@ -137,6 +137,8 @@ pub trait ActionStore<Ctx>: Send + Sync {
     async fn commit(&self, ctx: &Ctx, action: &ActionRequest, outcome: &ActionOutcome) -> Result<ActionResult, ActionError>;
 }
 ```
+
+实际实现还须提供覆盖执行的按块事务 / 保留权：同 ID 绑定检查只标记待回放，`authorize` 通过后才可读取结果；不同 ID 不能在执行副作用之后才竞争状态 CAS。上述是接口职责草图，事务句柄和提交方法按此语义实现。
 
 `dispatch()` 固定执行 [protocol.md 5.2](protocol.md#52-服务端处理顺序库的-dispatcher-固定执行) 的七步；宿主只填“加载、权限、执行、保存”四个点，不能跳过参数校验和破坏性确认检查。
 

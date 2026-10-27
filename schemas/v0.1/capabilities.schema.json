@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/zz-howard/chatweave/schemas/v0.1/capabilities.schema.json",
-  "title": "ChatWeave Client Capabilities (draft 0.1)",
-  "description": "DRAFT. What a client can render. Sent with each request that may produce an assistant message (JSON body field or the compact ChatWeave-Capabilities header, see docs/protocol.md). The server uses it to pick protocol version and to prefer block types the client supports; clients must still fall back safely on anything unknown.",
+  "title": "ChatWeave Client Capabilities (0.1)",
+  "description": "What a client can render. Sent with each request that may produce an assistant message (JSON body field or the compact ChatWeave-Capabilities header, see docs/protocol.md). The server uses it to pick protocol version and to prefer block types the client supports; clients must still fall back safely on anything unknown.",
   "type": "object",
   "required": ["protocolVersions", "blocks"],
   "additionalProperties": false,

@@ -1,0 +1,3532 @@
+{
+  "formatVersion": 1,
+  "scenarios": [
+    {
+      "name": "normal-answer",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj"
+            ]
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "completed",
+          "patches": [
+            {
+              "messageId": "msg_weather",
+              "blockId": "b1",
+              "rev": 2,
+              "patch": {
+                "data": {
+                  "state": {
+                    "status": "resolved",
+                    "selected": [
+                      "bj"
+                    ],
+                    "resolvedAt": "2026-10-26T09:31:00Z"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 2,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "resolved",
+                "selected": [
+                  "bj"
+                ],
+                "resolvedAt": "2026-10-26T09:31:00Z"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      }
+    },
+    {
+      "name": "same-id-replay",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj"
+            ]
+          }
+        },
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj"
+            ]
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "completed",
+          "patches": [
+            {
+              "messageId": "msg_weather",
+              "blockId": "b1",
+              "rev": 2,
+              "patch": {
+                "data": {
+                  "state": {
+                    "status": "resolved",
+                    "selected": [
+                      "bj"
+                    ],
+                    "resolvedAt": "2026-10-26T09:31:00Z"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "actionId": "action_0001",
+          "status": "completed",
+          "patches": [
+            {
+              "messageId": "msg_weather",
+              "blockId": "b1",
+              "rev": 2,
+              "patch": {
+                "data": {
+                  "state": {
+                    "status": "resolved",
+                    "selected": [
+                      "bj"
+                    ],
+                    "resolvedAt": "2026-10-26T09:31:00Z"
+                  }
+                }
+              }
+            }
+          ],
+          "replayed": true
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 2,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "resolved",
+                "selected": [
+                  "bj"
+                ],
+                "resolvedAt": "2026-10-26T09:31:00Z"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "executeCount": 1
+    },
+    {
+      "name": "authorization-before-replay",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj"
+            ]
+          }
+        },
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj"
+            ]
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "completed",
+          "patches": [
+            {
+              "messageId": "msg_weather",
+              "blockId": "b1",
+              "rev": 2,
+              "patch": {
+                "data": {
+                  "state": {
+                    "status": "resolved",
+                    "selected": [
+                      "bj"
+                    ],
+                    "resolvedAt": "2026-10-26T09:31:00Z"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "forbidden",
+            "message": "无权回答"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 2,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "resolved",
+                "selected": [
+                  "bj"
+                ],
+                "resolvedAt": "2026-10-26T09:31:00Z"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "authorizeDecisions": [
+        true,
+        false
+      ],
+      "executeCount": 1
+    },
+    {
+      "name": "first-answer-wins",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj"
+            ]
+          }
+        },
+        {
+          "id": "action_0002",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "sh"
+            ]
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "completed",
+          "patches": [
+            {
+              "messageId": "msg_weather",
+              "blockId": "b1",
+              "rev": 2,
+              "patch": {
+                "data": {
+                  "state": {
+                    "status": "resolved",
+                    "selected": [
+                      "bj"
+                    ],
+                    "resolvedAt": "2026-10-26T09:31:00Z"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "actionId": "action_0002",
+          "status": "rejected",
+          "error": {
+            "code": "already_resolved",
+            "message": "问题已经回答"
+          },
+          "patches": [
+            {
+              "messageId": "msg_weather",
+              "blockId": "b1",
+              "rev": 2,
+              "patch": {
+                "data": {
+                  "state": {
+                    "status": "resolved",
+                    "selected": [
+                      "bj"
+                    ],
+                    "resolvedAt": "2026-10-26T09:31:00Z"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 2,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "resolved",
+                "selected": [
+                  "bj"
+                ],
+                "resolvedAt": "2026-10-26T09:31:00Z"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "executeCount": 1
+    },
+    {
+      "name": "expired",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 2,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "expired"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj"
+            ]
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "expired",
+            "message": "问题已关闭"
+          },
+          "patches": [
+            {
+              "messageId": "msg_weather",
+              "blockId": "b1",
+              "rev": 2,
+              "patch": {
+                "data": {
+                  "state": {
+                    "status": "expired"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 2,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "expired"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "superseded",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 2,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "superseded",
+                "supersededBy": "b2"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj"
+            ]
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "superseded",
+            "message": "问题已关闭"
+          },
+          "patches": [
+            {
+              "messageId": "msg_weather",
+              "blockId": "b1",
+              "rev": 2,
+              "patch": {
+                "data": {
+                  "state": {
+                    "status": "superseded",
+                    "supersededBy": "b2"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 2,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "superseded",
+                "supersededBy": "b2"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "server-cancelled",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 2,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "cancelled",
+                "reason": {
+                  "code": "record_changed"
+                }
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj"
+            ]
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "already_resolved",
+            "message": "问题已关闭"
+          },
+          "patches": [
+            {
+              "messageId": "msg_weather",
+              "blockId": "b1",
+              "rev": 2,
+              "patch": {
+                "data": {
+                  "state": {
+                    "status": "cancelled",
+                    "reason": {
+                      "code": "record_changed"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 2,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "cancelled",
+                "reason": {
+                  "code": "record_changed"
+                }
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "interrupt-answer",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "paused",
+        "rev": 0,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "删除待办？",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "confirmation",
+            "schemaVersion": 1,
+            "data": {
+              "title": "删除待办？",
+              "severity": "destructive",
+              "action": {
+                "type": "confirmation.respond",
+                "target": "todo.delete",
+                "requiresConfirmation": true,
+                "expiresAt": "2026-10-27T09:30:00Z"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "删除待办？"
+          }
+        ],
+        "lastSeq": 6,
+        "interrupt": {
+          "id": "int_1",
+          "stepId": "s1",
+          "blockId": "b1",
+          "reason": "confirmation"
+        },
+        "steps": [
+          {
+            "id": "s1",
+            "label": "删除待办",
+            "state": "awaiting_user",
+            "blockId": "b1"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "confirmation.respond",
+          "target": "todo.delete",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "outcome": "confirm"
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "accepted",
+          "resume": {
+            "messageId": "msg_weather",
+            "streamable": true
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "streaming",
+        "rev": 0,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "删除待办？",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "confirmation",
+            "schemaVersion": 1,
+            "data": {
+              "title": "删除待办？",
+              "severity": "destructive",
+              "action": {
+                "type": "confirmation.respond",
+                "target": "todo.delete",
+                "requiresConfirmation": true,
+                "expiresAt": "2026-10-27T09:30:00Z"
+              },
+              "state": {
+                "status": "resolved",
+                "outcome": "confirm",
+                "resolvedAt": "2026-10-26T09:31:00Z"
+              }
+            },
+            "fallbackText": "删除待办？"
+          }
+        ],
+        "lastSeq": 8,
+        "steps": [
+          {
+            "id": "s1",
+            "label": "删除待办",
+            "state": "running",
+            "blockId": "b1"
+          }
+        ]
+      },
+      "executeCount": 1
+    },
+    {
+      "name": "interrupt-free-text",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "paused",
+        "rev": 0,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "删除待办？",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ],
+        "lastSeq": 6,
+        "interrupt": {
+          "id": "int_1",
+          "stepId": "s1",
+          "blockId": "b1",
+          "reason": "confirmation"
+        },
+        "steps": [
+          {
+            "id": "s1",
+            "label": "删除待办",
+            "state": "awaiting_user",
+            "blockId": "b1"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "freeText": "请保留这条待办"
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "accepted",
+          "resume": {
+            "messageId": "msg_weather",
+            "streamable": true
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "streaming",
+        "rev": 0,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "删除待办？",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "resolved",
+                "freeText": "请保留这条待办",
+                "resolvedAt": "2026-10-26T09:31:00Z"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ],
+        "lastSeq": 8,
+        "steps": [
+          {
+            "id": "s1",
+            "label": "删除待办",
+            "state": "running",
+            "blockId": "b1"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "interrupt-confirmation-free-text",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "paused",
+        "rev": 0,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "删除待办？",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "confirmation",
+            "schemaVersion": 1,
+            "data": {
+              "title": "删除待办？",
+              "severity": "destructive",
+              "action": {
+                "type": "confirmation.respond",
+                "target": "todo.delete",
+                "requiresConfirmation": true,
+                "expiresAt": "2026-10-27T09:30:00Z"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "删除待办？"
+          }
+        ],
+        "lastSeq": 6,
+        "interrupt": {
+          "id": "int_1",
+          "stepId": "s1",
+          "blockId": "b1",
+          "reason": "confirmation"
+        },
+        "steps": [
+          {
+            "id": "s1",
+            "label": "删除待办",
+            "state": "awaiting_user",
+            "blockId": "b1"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "confirmation.respond",
+          "target": "todo.delete",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "freeText": "请改天再删"
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "accepted",
+          "resume": {
+            "messageId": "msg_weather",
+            "streamable": true
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "streaming",
+        "rev": 0,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "删除待办？",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "confirmation",
+            "schemaVersion": 1,
+            "data": {
+              "title": "删除待办？",
+              "severity": "destructive",
+              "action": {
+                "type": "confirmation.respond",
+                "target": "todo.delete",
+                "requiresConfirmation": true,
+                "expiresAt": "2026-10-27T09:30:00Z"
+              },
+              "state": {
+                "status": "resolved",
+                "freeText": "请改天再删",
+                "resolvedAt": "2026-10-26T09:31:00Z"
+              }
+            },
+            "fallbackText": "删除待办？"
+          }
+        ],
+        "lastSeq": 8,
+        "steps": [
+          {
+            "id": "s1",
+            "label": "删除待办",
+            "state": "running",
+            "blockId": "b1"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "interrupt-form-free-text",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "paused",
+        "rev": 0,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "删除待办？",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "form_intent",
+            "schemaVersion": 1,
+            "data": {
+              "title": "新建待办",
+              "fields": [
+                {
+                  "key": "title",
+                  "label": "事项",
+                  "type": "text",
+                  "required": true,
+                  "maxLength": 100
+                },
+                {
+                  "key": "priority",
+                  "label": "优先级",
+                  "type": "integer",
+                  "min": 1,
+                  "max": 3
+                }
+              ],
+              "action": {
+                "type": "form.submit",
+                "target": "todo.create"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "填写事项和优先级"
+          }
+        ],
+        "lastSeq": 6,
+        "interrupt": {
+          "id": "int_1",
+          "stepId": "s1",
+          "blockId": "b1",
+          "reason": "confirmation"
+        },
+        "steps": [
+          {
+            "id": "s1",
+            "label": "删除待办",
+            "state": "awaiting_user",
+            "blockId": "b1"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "form.submit",
+          "target": "todo.create",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "freeText": "明天浇花"
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "accepted",
+          "resume": {
+            "messageId": "msg_weather",
+            "streamable": true
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "streaming",
+        "rev": 0,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "删除待办？",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "form_intent",
+            "schemaVersion": 1,
+            "data": {
+              "title": "新建待办",
+              "fields": [
+                {
+                  "key": "title",
+                  "label": "事项",
+                  "type": "text",
+                  "required": true,
+                  "maxLength": 100
+                },
+                {
+                  "key": "priority",
+                  "label": "优先级",
+                  "type": "integer",
+                  "min": 1,
+                  "max": 3
+                }
+              ],
+              "action": {
+                "type": "form.submit",
+                "target": "todo.create"
+              },
+              "state": {
+                "status": "resolved",
+                "freeText": "明天浇花",
+                "resolvedAt": "2026-10-26T09:31:00Z"
+              }
+            },
+            "fallbackText": "填写事项和优先级"
+          }
+        ],
+        "lastSeq": 8,
+        "steps": [
+          {
+            "id": "s1",
+            "label": "删除待办",
+            "state": "running",
+            "blockId": "b1"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "interrupt-cancel",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "paused",
+        "rev": 0,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "删除待办？",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "confirmation",
+            "schemaVersion": 1,
+            "data": {
+              "title": "删除待办？",
+              "severity": "destructive",
+              "action": {
+                "type": "confirmation.respond",
+                "target": "todo.delete",
+                "requiresConfirmation": true,
+                "expiresAt": "2026-10-27T09:30:00Z"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "删除待办？"
+          }
+        ],
+        "lastSeq": 6,
+        "interrupt": {
+          "id": "int_1",
+          "stepId": "s1",
+          "blockId": "b1",
+          "reason": "confirmation"
+        },
+        "steps": [
+          {
+            "id": "s1",
+            "label": "删除待办",
+            "state": "awaiting_user",
+            "blockId": "b1"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "confirmation.respond",
+          "target": "todo.delete",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "outcome": "cancel"
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "accepted",
+          "resume": {
+            "messageId": "msg_weather",
+            "streamable": true
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "streaming",
+        "rev": 0,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "删除待办？",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "confirmation",
+            "schemaVersion": 1,
+            "data": {
+              "title": "删除待办？",
+              "severity": "destructive",
+              "action": {
+                "type": "confirmation.respond",
+                "target": "todo.delete",
+                "requiresConfirmation": true,
+                "expiresAt": "2026-10-27T09:30:00Z"
+              },
+              "state": {
+                "status": "resolved",
+                "outcome": "cancel",
+                "resolvedAt": "2026-10-26T09:31:00Z"
+              }
+            },
+            "fallbackText": "删除待办？"
+          }
+        ],
+        "lastSeq": 8,
+        "steps": [
+          {
+            "id": "s1",
+            "label": "删除待办",
+            "state": "running",
+            "blockId": "b1"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "interrupt-other-device",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "paused",
+        "rev": 0,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "删除待办？",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "confirmation",
+            "schemaVersion": 1,
+            "data": {
+              "title": "删除待办？",
+              "severity": "destructive",
+              "action": {
+                "type": "confirmation.respond",
+                "target": "todo.delete",
+                "requiresConfirmation": true,
+                "expiresAt": "2026-10-27T09:30:00Z"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "删除待办？"
+          }
+        ],
+        "lastSeq": 6,
+        "interrupt": {
+          "id": "int_1",
+          "stepId": "s1",
+          "blockId": "b1",
+          "reason": "confirmation"
+        },
+        "steps": [
+          {
+            "id": "s1",
+            "label": "删除待办",
+            "state": "awaiting_user",
+            "blockId": "b1"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "confirmation.respond",
+          "target": "todo.delete",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "outcome": "confirm"
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "already_resolved",
+            "message": "另一台设备已经回答"
+          },
+          "resume": {
+            "messageId": "msg_weather"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "streaming",
+        "rev": 0,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "删除待办？",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "confirmation",
+            "schemaVersion": 1,
+            "data": {
+              "title": "删除待办？",
+              "severity": "destructive",
+              "action": {
+                "type": "confirmation.respond",
+                "target": "todo.delete",
+                "requiresConfirmation": true,
+                "expiresAt": "2026-10-27T09:30:00Z"
+              },
+              "state": {
+                "status": "resolved",
+                "outcome": "confirm",
+                "resolvedAt": "2026-10-26T09:31:00Z"
+              }
+            },
+            "fallbackText": "删除待办？"
+          }
+        ],
+        "lastSeq": 8,
+        "steps": [
+          {
+            "id": "s1",
+            "label": "删除待办",
+            "state": "running",
+            "blockId": "b1"
+          }
+        ]
+      },
+      "concurrentAnswer": {
+        "outcome": "confirm"
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "reject-undeclared",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "天气晴朗。",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "markdown",
+            "schemaVersion": 1,
+            "data": {
+              "text": "天气晴朗。"
+            }
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj"
+            ]
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "target_mismatch",
+            "message": "请求被拒绝"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "天气晴朗。",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "markdown",
+            "schemaVersion": 1,
+            "data": {
+              "text": "天气晴朗。"
+            }
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "reject-target",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.other",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj"
+            ]
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "target_mismatch",
+            "message": "请求被拒绝"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "reject-option",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "missing"
+            ]
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "invalid_payload",
+            "message": "请求被拒绝"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "reject-selection-count",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj",
+              "sh"
+            ]
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "invalid_payload",
+            "message": "请求被拒绝"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "reject-authorize",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj"
+            ]
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "forbidden",
+            "message": "请求被拒绝"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "executeCount": 0,
+      "authorizeDecisions": [
+        false
+      ]
+    },
+    {
+      "name": "reject-free-text-outside-interrupt",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "freeText": "北京"
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "invalid_payload",
+            "message": "请求被拒绝"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "reject-interrupt-free-text-disabled",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "paused",
+        "rev": 0,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "删除待办？",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "confirmation",
+            "schemaVersion": 1,
+            "data": {
+              "title": "删除待办？",
+              "severity": "destructive",
+              "action": {
+                "type": "confirmation.respond",
+                "target": "todo.delete",
+                "requiresConfirmation": true,
+                "expiresAt": "2026-10-27T09:30:00Z"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "删除待办？"
+          }
+        ],
+        "lastSeq": 6,
+        "interrupt": {
+          "id": "int_1",
+          "stepId": "s1",
+          "blockId": "b1",
+          "reason": "confirmation",
+          "otherInput": false
+        },
+        "steps": [
+          {
+            "id": "s1",
+            "label": "删除待办",
+            "state": "awaiting_user",
+            "blockId": "b1"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "confirmation.respond",
+          "target": "todo.delete",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "freeText": "暂不删除"
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "invalid_payload",
+            "message": "请求被拒绝"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "paused",
+        "rev": 0,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "删除待办？",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "confirmation",
+            "schemaVersion": 1,
+            "data": {
+              "title": "删除待办？",
+              "severity": "destructive",
+              "action": {
+                "type": "confirmation.respond",
+                "target": "todo.delete",
+                "requiresConfirmation": true,
+                "expiresAt": "2026-10-27T09:30:00Z"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "删除待办？"
+          }
+        ],
+        "lastSeq": 6,
+        "interrupt": {
+          "id": "int_1",
+          "stepId": "s1",
+          "blockId": "b1",
+          "reason": "confirmation",
+          "otherInput": false
+        },
+        "steps": [
+          {
+            "id": "s1",
+            "label": "删除待办",
+            "state": "awaiting_user",
+            "blockId": "b1"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "reject-destructive-choice",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "todo.delete"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "todo.delete",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj"
+            ]
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "confirmation_required",
+            "message": "请求被拒绝"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "todo.delete"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "executeCount": 0,
+      "destructive": true
+    },
+    {
+      "name": "reject-form-out-of-range",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "填写事项和优先级",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "form_intent",
+            "schemaVersion": 1,
+            "data": {
+              "title": "新建待办",
+              "fields": [
+                {
+                  "key": "title",
+                  "label": "事项",
+                  "type": "text",
+                  "required": true,
+                  "maxLength": 100
+                },
+                {
+                  "key": "priority",
+                  "label": "优先级",
+                  "type": "integer",
+                  "min": 1,
+                  "max": 3
+                }
+              ],
+              "action": {
+                "type": "form.submit",
+                "target": "todo.create"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "填写事项和优先级"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "form.submit",
+          "target": "todo.create",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "values": {
+              "title": "浇花",
+              "priority": 9
+            }
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "invalid_payload",
+            "message": "请求被拒绝"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "填写事项和优先级",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "form_intent",
+            "schemaVersion": 1,
+            "data": {
+              "title": "新建待办",
+              "fields": [
+                {
+                  "key": "title",
+                  "label": "事项",
+                  "type": "text",
+                  "required": true,
+                  "maxLength": 100
+                },
+                {
+                  "key": "priority",
+                  "label": "优先级",
+                  "type": "integer",
+                  "min": 1,
+                  "max": 3
+                }
+              ],
+              "action": {
+                "type": "form.submit",
+                "target": "todo.create"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "填写事项和优先级"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "reject-form-required",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "填写事项和优先级",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "form_intent",
+            "schemaVersion": 1,
+            "data": {
+              "title": "新建待办",
+              "fields": [
+                {
+                  "key": "title",
+                  "label": "事项",
+                  "type": "text",
+                  "required": true,
+                  "maxLength": 100
+                },
+                {
+                  "key": "priority",
+                  "label": "优先级",
+                  "type": "integer",
+                  "min": 1,
+                  "max": 3
+                }
+              ],
+              "action": {
+                "type": "form.submit",
+                "target": "todo.create"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "填写事项和优先级"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "form.submit",
+          "target": "todo.create",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "values": {
+              "priority": 1
+            }
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "invalid_payload",
+            "message": "请求被拒绝"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "填写事项和优先级",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "form_intent",
+            "schemaVersion": 1,
+            "data": {
+              "title": "新建待办",
+              "fields": [
+                {
+                  "key": "title",
+                  "label": "事项",
+                  "type": "text",
+                  "required": true,
+                  "maxLength": 100
+                },
+                {
+                  "key": "priority",
+                  "label": "优先级",
+                  "type": "integer",
+                  "min": 1,
+                  "max": 3
+                }
+              ],
+              "action": {
+                "type": "form.submit",
+                "target": "todo.create"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "填写事项和优先级"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "reject-form-extra-field",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "填写事项和优先级",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "form_intent",
+            "schemaVersion": 1,
+            "data": {
+              "title": "新建待办",
+              "fields": [
+                {
+                  "key": "title",
+                  "label": "事项",
+                  "type": "text",
+                  "required": true,
+                  "maxLength": 100
+                },
+                {
+                  "key": "priority",
+                  "label": "优先级",
+                  "type": "integer",
+                  "min": 1,
+                  "max": 3
+                }
+              ],
+              "action": {
+                "type": "form.submit",
+                "target": "todo.create"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "填写事项和优先级"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "form.submit",
+          "target": "todo.create",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "values": {
+              "title": "浇花",
+              "unknown": "值"
+            }
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "invalid_payload",
+            "message": "请求被拒绝"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "填写事项和优先级",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "form_intent",
+            "schemaVersion": 1,
+            "data": {
+              "title": "新建待办",
+              "fields": [
+                {
+                  "key": "title",
+                  "label": "事项",
+                  "type": "text",
+                  "required": true,
+                  "maxLength": 100
+                },
+                {
+                  "key": "priority",
+                  "label": "优先级",
+                  "type": "integer",
+                  "min": 1,
+                  "max": 3
+                }
+              ],
+              "action": {
+                "type": "form.submit",
+                "target": "todo.create"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "填写事项和优先级"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "reject-form-long-text",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "填写事项和优先级",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "form_intent",
+            "schemaVersion": 1,
+            "data": {
+              "title": "新建待办",
+              "fields": [
+                {
+                  "key": "title",
+                  "label": "事项",
+                  "type": "text",
+                  "required": true,
+                  "maxLength": 100
+                },
+                {
+                  "key": "priority",
+                  "label": "优先级",
+                  "type": "integer",
+                  "min": 1,
+                  "max": 3
+                }
+              ],
+              "action": {
+                "type": "form.submit",
+                "target": "todo.create"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "填写事项和优先级"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "form.submit",
+          "target": "todo.create",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "values": {
+              "title": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "priority": 1
+            }
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "invalid_payload",
+            "message": "请求被拒绝"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "填写事项和优先级",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "form_intent",
+            "schemaVersion": 1,
+            "data": {
+              "title": "新建待办",
+              "fields": [
+                {
+                  "key": "title",
+                  "label": "事项",
+                  "type": "text",
+                  "required": true,
+                  "maxLength": 100
+                },
+                {
+                  "key": "priority",
+                  "label": "优先级",
+                  "type": "integer",
+                  "min": 1,
+                  "max": 3
+                }
+              ],
+              "action": {
+                "type": "form.submit",
+                "target": "todo.create"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "填写事项和优先级"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "reject-form-integer",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "填写事项和优先级",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "form_intent",
+            "schemaVersion": 1,
+            "data": {
+              "title": "新建待办",
+              "fields": [
+                {
+                  "key": "title",
+                  "label": "事项",
+                  "type": "text",
+                  "required": true,
+                  "maxLength": 100
+                },
+                {
+                  "key": "priority",
+                  "label": "优先级",
+                  "type": "integer",
+                  "min": 1,
+                  "max": 3
+                }
+              ],
+              "action": {
+                "type": "form.submit",
+                "target": "todo.create"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "填写事项和优先级"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "form.submit",
+          "target": "todo.create",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "values": {
+              "title": "浇花",
+              "priority": 1.5
+            }
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "invalid_payload",
+            "message": "请求被拒绝"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "填写事项和优先级",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "form_intent",
+            "schemaVersion": 1,
+            "data": {
+              "title": "新建待办",
+              "fields": [
+                {
+                  "key": "title",
+                  "label": "事项",
+                  "type": "text",
+                  "required": true,
+                  "maxLength": 100
+                },
+                {
+                  "key": "priority",
+                  "label": "优先级",
+                  "type": "integer",
+                  "min": 1,
+                  "max": 3
+                }
+              ],
+              "action": {
+                "type": "form.submit",
+                "target": "todo.create"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "填写事项和优先级"
+          }
+        ]
+      },
+      "executeCount": 0
+    },
+    {
+      "name": "same-id-different-payload",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj"
+            ]
+          }
+        },
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "sh"
+            ]
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "completed",
+          "patches": [
+            {
+              "messageId": "msg_weather",
+              "blockId": "b1",
+              "rev": 2,
+              "patch": {
+                "data": {
+                  "state": {
+                    "status": "resolved",
+                    "selected": [
+                      "bj"
+                    ],
+                    "resolvedAt": "2026-10-26T09:31:00Z"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "invalid_request",
+            "message": "动作ID已绑定其他请求"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 2,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "resolved",
+                "selected": [
+                  "bj"
+                ],
+                "resolvedAt": "2026-10-26T09:31:00Z"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "executeCount": 1
+    },
+    {
+      "name": "same-id-different-target",
+      "seedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 1,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "open"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "requests": [
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.select",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj"
+            ]
+          }
+        },
+        {
+          "id": "action_0001",
+          "protocolVersion": "0.1",
+          "type": "choice.select",
+          "target": "weather.other",
+          "context": {
+            "conversationId": "conv_weather",
+            "messageId": "msg_weather",
+            "blockId": "b1"
+          },
+          "payload": {
+            "selected": [
+              "bj"
+            ]
+          }
+        }
+      ],
+      "results": [
+        {
+          "actionId": "action_0001",
+          "status": "completed",
+          "patches": [
+            {
+              "messageId": "msg_weather",
+              "blockId": "b1",
+              "rev": 2,
+              "patch": {
+                "data": {
+                  "state": {
+                    "status": "resolved",
+                    "selected": [
+                      "bj"
+                    ],
+                    "resolvedAt": "2026-10-26T09:31:00Z"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "actionId": "action_0001",
+          "status": "rejected",
+          "error": {
+            "code": "invalid_request",
+            "message": "动作ID已绑定其他请求"
+          }
+        }
+      ],
+      "expectedMessage": {
+        "id": "msg_weather",
+        "protocolVersion": "0.1",
+        "conversationId": "conv_weather",
+        "role": "assistant",
+        "status": "complete",
+        "rev": 2,
+        "createdAt": "2026-10-26T09:30:00Z",
+        "fallbackText": "请选择北京或上海",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "choice",
+            "schemaVersion": 1,
+            "data": {
+              "prompt": "查哪个城市？",
+              "options": [
+                {
+                  "id": "bj",
+                  "label": "北京"
+                },
+                {
+                  "id": "sh",
+                  "label": "上海"
+                }
+              ],
+              "selection": "single",
+              "action": {
+                "type": "choice.select",
+                "target": "weather.select"
+              },
+              "state": {
+                "status": "resolved",
+                "selected": [
+                  "bj"
+                ],
+                "resolvedAt": "2026-10-26T09:31:00Z"
+              }
+            },
+            "fallbackText": "请选择北京或上海"
+          }
+        ]
+      },
+      "executeCount": 1
+    }
+  ]
+}
