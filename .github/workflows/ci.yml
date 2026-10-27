@@ -21,13 +21,13 @@ jobs:
         run: cargo fmt --all --check
       - name: Clippy (all targets and features)
         working-directory: rust
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
       - name: Test without optional web integration
         working-directory: rust
-        run: cargo test --workspace
+        run: cargo test --locked --workspace
       - name: Test with optional web integration
         working-directory: rust
-        run: cargo test --workspace --all-features
+        run: cargo test --locked --workspace --all-features
       - name: Dependency boundaries
         run: tool/check_deps
       - name: Schema and conformance validation
