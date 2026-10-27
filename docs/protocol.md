@@ -269,9 +269,9 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 | `state.status` | 含义 | 客户端显示 |
 |---|---|---|
 | `open` | 等待回答 | 可操作（前提见 [rendering.md 4.2](rendering.md#42-交互块的显示状态)） |
-| `resolved` | 已记录一个答案：`selected` / `outcome` / `values` / `freeText`，以及 `resolvedBy`（宿主的不透明成员 ID）、`resolvedAt`（必填） | 服务端记录的结果和“谁、何时”；控件禁用 |
+| `resolved` | 已记录一个答案：`selected` / `outcome` / `values` / `freeText`，以及 `resolvedBy`（宿主的不透明成员 ID）、`resolvedAt`（必填） | 服务端记录的结果和“谁、何时”；用户 `outcome: "cancel"` 显示“你已取消”；控件禁用 |
 | `expired` | 到了 `action.expiresAt` 仍没有回答 | “已过期”，控件禁用 |
-| `cancelled` | 服务端作废了这次询问，**必须**带 `reason`（例如引用的记录已变化或删除、权限变化、服务端策略拒绝）。注意：用户自己在确认卡上点“取消”不是这个状态，而是 `resolved` + `outcome: "cancel"` | “已取消”+ 原因说明，控件禁用 |
+| `cancelled` | 服务端作废了这次询问，**必须**带 `reason`（例如引用的记录已变化或删除、权限变化、服务端策略拒绝）。注意：用户自己在确认卡上点“取消”不是这个状态，而是 `resolved` + `outcome: "cancel"` | “已作废”+ 原因说明，控件禁用 |
 | `superseded` | 被一个更新的交互块取代（例如助手针对同一操作重新发了一张确认卡），`supersededBy` 指向新块 | “已被新的请求取代”，控件禁用 |
 
 **谁、为什么**（[D45](decisions.md)）：
