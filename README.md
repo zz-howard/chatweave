@@ -1,6 +1,6 @@
 # ChatWeave
 
-> **ChatWeave** is a Markdown-first, hybrid Generative UI library for chat apps. Agents keep answering in streaming Markdown, and when information really is structured (metrics, tables, time series, comparisons, status, choices, confirmations, forms) they emit validated **semantic blocks** that the client renders with native components. Text and components interleave in one message. ChatWeave ships a language-neutral protocol with JSON Schemas, Rust crates for the server (types, validation, an SSE stream emitter for Axum, an action registry) and Flutter packages for the client (stream parser, block store with resume, renderer, component registry, neutral themeable components). It knows nothing about any host's business domain. **Status: design stage, no code yet.**
+> **ChatWeave** is a Markdown-first, hybrid Generative UI library for chat apps. Agents keep answering in streaming Markdown, and when information really is structured (metrics, tables, time series, comparisons, status, choices, confirmations, forms) they emit validated **semantic blocks** that the client renders with native components. Text and components interleave in one message. ChatWeave ships a language-neutral protocol with JSON Schemas, Rust crates for the server (types, validation, an SSE stream emitter for Axum, an action registry) and Dart/Flutter workspace scaffolds for the planned client implementation. It knows nothing about any host's business domain. **Status: CW1 Rust core (T0–T4) implemented; build-machine validation pending.**
 
 ChatWeave 是一个 **Markdown 优先的混合式生成 UI 聊天库**：回答默认仍是边生成边显示的 Markdown；信息确实适合结构化展示时，Agent 输出经过校验的**语义块**，客户端用原生组件画出来，文字和组件在同一条消息里自然交错。
 
@@ -8,7 +8,7 @@ ChatWeave 是一个 **Markdown 优先的混合式生成 UI 聊天库**：回答�
 
 ## 当前状态
 
-**设计阶段（草案），还没有代码。** 本仓库目前只有设计文档和 JSON Schema 草案（协议 0.1）。
+**CW1 Rust 核心（T0–T4）已实现，待构建机完成验收。** 协议与 JSON Schema 已定稿为 0.1；Dart/Flutter 目前只有 workspace 空包与占位测试，客户端实现与示例 App 属于后续任务。
 
 ## 为什么做
 
@@ -104,9 +104,9 @@ ChatWeaveTheme(
 README.md
 LICENSE                      MIT
 schemas/v0.1/                JSON Schema（draft 2020-12）：content-block / message / stream-event / action / capabilities / generation
-fixtures/conformance/        一致性夹具（事件流 → 期望消息），Rust 与 Dart 共用（规划）
-rust/crates/                 chatweave-protocol、chatweave-server（规划）
-dart/packages/               chatweave_core（纯 Dart）、chatweave_flutter（规划）
+fixtures/conformance/        一致性夹具（事件流 → 期望消息），供 Rust 与 Dart 共用
+rust/crates/                 chatweave-protocol、chatweave-server
+dart/packages/               chatweave_core、chatweave_flutter（空包骨架）
 examples/assist_demo/        非记账领域示例：天气 + 待办助手（规划）
 tool/                        CI 检查：依赖方向、宿主词汇拦截、Schema 校验（规划）
 docs/

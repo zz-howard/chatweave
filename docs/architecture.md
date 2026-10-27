@@ -1,6 +1,6 @@
 # ChatWeave 架构（草案）
 
-> **状态：草案，设计阶段，尚无代码。** 协议细节见 [protocol.md](protocol.md)，流式细节见 [streaming.md](streaming.md)，渲染见 [rendering.md](rendering.md)。
+> **状态：CW1 Rust 核心（T0–T4）已实现，构建机验收待验证；Dart/Flutter 仅有空包骨架。** 协议细节见 [protocol.md](protocol.md)，流式细节见 [streaming.md](streaming.md)，渲染见 [rendering.md](rendering.md)。
 
 ## 1. 定位
 
