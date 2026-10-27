@@ -46,6 +46,8 @@ jobs:
           channel: stable
           flutter-version: '3.47.8'
           cache: true
+      - name: Check generated Dart schemas
+        run: python3 tool/generate_dart_schemas.py --check
       - name: Resolve workspace
         working-directory: dart
         run: flutter pub get

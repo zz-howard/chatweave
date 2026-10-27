@@ -10,7 +10,9 @@
 - **失败只影响一个块**：任何组件构建出错，都只把这个块换成兜底文本，整条消息照常显示。
 - **结果以服务端为准**：交互块不乐观显示结果，点按之后只显示“提交中”，服务端确认后才显示结果。
 - **过程看得见、但不打扰**：AI 回答前做了哪些步骤，列在消息顶部的过程条里，回答完成后自动收起成一行；子 Agent 的步骤收在委派步骤那一行里；只显示宿主写的说明，不显示工具参数、原始数据和模型的思考文字（4.3）。
-- **问了就在原地等**：运行中途要用户确认或回答时，消息暂停在原地，回答显示在卡片上，同一条消息接着往下写（4.4）。
+- **问了就在原地等**：历史暂停的规范判据是 `step.blockId` 指向中断块；无需新增暂停历史字段。
+
+运行中途要用户确认或回答时，消息暂停在原地，回答显示在卡片上，同一条消息接着往下写（4.4）。
 
 ## 2. 组件注册表（BlockRegistry）
 
@@ -96,9 +98,15 @@ final registry = BlockRegistry.withDefaults()          // 内置 10 种类型的
 
 ## 4. 降级规则（客户端实现）
 
+存储恢复、message.snapshot、SyncMessage 与动作补丁均按消费方宽进处理：保留坏块原始内容与 fallbackText，由注册表仅降级该块为纯文本或 FallbackNote，兄弟块正常显示；FoldState 默认不因单块结构或数据校验失败拒绝整条消息。manifest 一致性测试显式启用 strictBlocks 生产方严格模式；消息级字节预算、seq/rev 与事件顺序检查仍有效。
+
+正文默认使用 `Text` / `RichText`，不创建带 longPress 的只读输入控件；选择复制由宿主在列表外包 `SelectionArea`，或使用消息操作栏的“复制”。
+
+当前错误边界可保证注册表工厂、parse 与边界内同步 layout / paint 报错的块级降级及每块一次回调（独立重布局和 intrinsic 路径尚未保证）。后代 Widget 的独立 build 由 Flutter 的 ComponentElement 捕获并报告，显示框架 ErrorWidget；兄弟块继续显示，但本库不能保证替换整个块或触发 onBlockRenderError。覆写父 Element.performRebuild 的作用域只能覆盖同步挂载，不能覆盖框架随后独立调度的后代 rebuild，故不以临时替换全局 ErrorWidget.builder 冒充完整隔离。宿主自定义组件应在自身 build 中处理预期错误并返回 fallback；未处理异常仍由宿主 FlutterError.onError 收集。
+
 对每个块：
 
-0. **每个块单独包一层错误边界**：组件在 `parse`、`build` 或之后的布局 / 绘制中抛出异常，只影响这个块——它原地换成自己的 `fallbackText`，同一条消息里的其他块照常显示。通过宿主注入的 `onBlockRenderError` 上报，**每个块 ID + 类型只上报一次**（列表反复重建不会刷屏）。
+0. **每个块单独包一层错误边界**：注册表工厂的 `parse` / `build` 及边界内同步布局 / 绘制异常会让该块原地换成自己的 `fallbackText`，同一条消息里的其他块照常显示；后代独立 build 的范围限制见本节开头。通过宿主注入的 `onBlockRenderError` 上报，**每个块 ID + 类型只上报一次**（列表反复重建不会刷屏）。
 1. 注册了该类型、`schemaVersion` 不超过支持版本、`parse` 成功、`build` 不抛异常 → 正常组件。
 2. 否则沿 `fallback` 链尝试下一个类型（内置链：`time_series → dataset`、`comparison → dataset`、`metric_group → metric 列表`）。
 3. 否则显示 `FallbackNote`：块的 `fallbackText`（中性样式，带一个小提示“更新 App 可查看完整内容”，读屏读出文字本身）。
@@ -128,7 +136,7 @@ final registry = BlockRegistry.withDefaults()          // 内置 10 种类型的
 | `open`，服务端明确拒绝（`invalid_payload`、`forbidden`、`conflict` 等） | 回到未操作状态，并在块内显示服务端给的 `message`（表单显示 `fieldErrors`） | 可用（重新操作会生成新幂等键） |
 | `open`，`unavailable` 或客户端超时 | “暂时无法确认结果，正在刷新…”；**不说“失败”**，因为动作可能已经执行 | 禁用，直到刷新到服务端状态；重试复用同一幂等键 |
 | `resolved` | 服务端记录的答案（选中的选项 / 文字回答 / 已确认或已取消 / 表单值摘要）+ 回答者与时间（宿主把 `resolvedBy` 解析成显示名；一对一会话里可以不显示回答者）。如果答案不是这台设备点的（群聊里别人先答，或一对一时同一用户在另一台设备上先答），照实显示服务端记录的那个答案。用户在确认卡上点“取消”也在这里，显示“你已取消” | 禁用 |
-| `expired` / `cancelled` / `superseded` | “已过期” / “已作废” + `reason.text`（没有时按 `reason.code` 给默认文案，如“相关记录已被删除”；`stopped` 为“已停止，没有等到回答”）/ “已被新的请求取代”；措辞要和用户自己点的“取消”区分开 | 禁用 |
+| `expired` / `cancelled` / `superseded` | “已过期” / “已作废” + `reason.text`（没有时按 `reason.code` 给默认文案，如“相关记录已被删除”；`stopped` 无说明时为“已停止，没有等到回答”；有 `reason.text` 时如实显示该说明，不附加“没有等到回答”）/ “已被新的请求取代”；措辞要和用户自己点的“取消”区分开 | 禁用 |
 | 没有 `ActionTransport`、会话只读，或宿主判定当前查看者不能回答 | 内容与状态照常显示，附一行简短说明（例如“仅可查看”） | 禁用；**不会**改为把选项文字作为消息发出 |
 
 文案原则：只有服务端明确拒绝时才用“没能完成”这类说法；结果未知时只说“正在确认”。
@@ -146,12 +154,12 @@ final registry = BlockRegistry.withDefaults()          // 内置 10 种类型的
 | 消息结束后（`message.end` 或持久化版本到达） | **自动收起成一行摘要**，例如“查了 3 项 · 用时 4 秒”；有失败时“查了 3 项（1 项没有完成）· 用时 4 秒”；被停止时“查了 2 项 · 已停止”。点按展开 / 收起 |
 
 - **行的内容**：状态图标 + `label` + 结果（耗时或状态文字）+ 可选的一行 `summary`（弱化样式，在 `label` 下方或同一行末尾）。原始查询结果不显示（协议里也没有）。
-- **耗时**：按 `durationMs` 显示（不含等用户的时间），不足 10 秒保留一位小数（“0.8 秒”），否则取整（“12 秒”）；运行中的步骤不显示走字计时。摘要里的总用时 = 消息的 `completedAt − createdAt`，缺少时用最上层各步骤 `durationMs` 之和；**暂停过的消息**不显示总用时（总时长里有等用户的时间，没有意义），改为“查了 3 项 · 你确认了 1 项”这类说法。
+- **耗时**：按 `durationMs` 显示（不含等用户的时间），不足 10 秒保留一位小数（“0.8 秒”），否则取整（“12 秒”）；运行中的步骤不显示走字计时。摘要里的总用时 = 消息的 `completedAt − createdAt`，缺少时用最上层各步骤 `durationMs` 之和；**暂停过的消息**（规范判据：`step.blockId` 指向三种交互类型之一的中断块）不显示总用时（总时长里有等用户的时间，没有意义），改为“查了 3 项 · 你确认了 1 项”这类说法。
 - **数几项**：摘要里的“查了 N 项”只数最上层（主 Agent）的步骤；一个委派步骤算一项。
 - **失败只影响这一行**：失败的行用主题的 `status.warning` 样式 + 图标 + 文字“没有完成”，不用“错误”这类吓人的词；其他行和正文照常显示。
 - **等你确认**：`awaiting_user` 的行显示“等你确认”（确认卡）或“等你回答”（选项、表单），用主题的强调样式，点这一行滚动到 `blockId` 指向的块。确认卡本身只在正文里，不在过程条里重复。回答之后这一行先回到运行中（⏳），结束时照常显示结果和耗时，并在末尾附上回答的简短说明（“你已确认”“你选了：北京”，取自块的 `state`）；以后从历史打开也一样（步骤记录保留 `blockId`）。停止或过期时这一行显示“已停止”。
 - **子 Agent（嵌套步骤）**：带 `parentStepId` 的步骤画在它的委派步骤下面、缩进一级；**默认收起**：委派步骤那一行显示自己的状态，行尾是子步骤数（“3 步”）和展开箭头，点按展开 / 收起子步骤（与整条过程条的展开互相独立，展开状态同样放在 `chatweave_core`，按消息 ID + 步骤 ID）。收起时委派步骤这一行代表整个子 Agent：子 Agent 里有一步在等用户时，这一行显示“等你确认”并可点按滚动到那个块（不强制展开）；子步骤失败只在展开后的那一行显示，委派步骤自己的状态由宿主给出。最多 3 层，每层缩进一级。
-- **收起与展开**：自动收起只在 `message.end` 那一刻发生一次（暂停不算结束，暂停时不收起）。用户在生成中手动收起或展开过，就尊重用户的选择，不再自动切换。从历史记录打开的消息默认收起；打开一条暂停中的消息时默认展开，让“等你确认”那一行看得见。展开状态是本地显示状态，放在 `chatweave_core`（按消息 ID），列表回收不丢，不进协议。
+- **收起与展开**：自动收起只在 `message.end` 那一刻发生一次（暂停不算结束，暂停时不收起）。用户在生成中手动收起或展开过，就尊重用户的选择，不再自动切换。从历史记录打开的消息默认收起；打开一条暂停中的消息时默认展开，让“等你确认”那一行看得见。用户手动收起或展开时，以被点按的那一行为锚点保持不动（它下面的正文随之移动）；只有自动变化（新增步骤、`message.end` 自动收起）才以用户正在看的正文为锚点。展开状态是本地显示状态，放在 `chatweave_core`（按消息 ID），列表回收不丢，不进协议。
 - **与临时提示的关系**：有步骤处于运行中时不显示 `message.activity` 提示；没有运行中的步骤时（例如第一个步骤之前、所有步骤结束后模型还在组织回答）照常在消息末尾显示提示。
 - **不显示**：工具名、参数、原始数据、模型的思考文字——这些都不在协议里。
 - **纯文本与复制**：过程条不进 `fallbackText`、`plainTextSummary()`、复制内容和搜索。
@@ -159,9 +167,11 @@ final registry = BlockRegistry.withDefaults()          // 内置 10 种类型的
 
 ### 4.4 暂停与继续（中断）
 
+历史暂停的规范判据是 `step.blockId` 指向中断块；无需新增暂停历史字段。
+
 运行中途要用户确认或回答时，消息暂停（[protocol.md 4.8](protocol.md#48-中断暂停与继续同一条消息)）。界面上它仍是**同一条消息**：
 
-- **暂停中**：已出现的文字和组件照常显示；问题所在的交互块可操作；没有生成中的光标和临时提示，也不显示“连接中断”；过程条保持展开，那一行“等你确认 / 等你回答”。停止按钮仍可用（停止后卡片显示“已停止，没有等到回答”）。
+- **暂停中**：已出现的文字和组件照常显示；问题所在的交互块可操作；没有生成中的光标和临时提示，也不显示“连接中断”；过程条保持展开，那一行“等你确认 / 等你回答”。停止按钮仍可用（停止后卡片优先显示服务端 `state.reason.text`；无说明时显示“已停止，没有等到回答”）。
 - **回答**：交互块照常“提交中 → 服务端结果”（4.2，不乐观显示）。回答显示在**卡片上**（选中的选项打勾、“已确认”、文字回答显示为卡片里的一行“你的回答：……”），**不**在对话里多出一条用户气泡。
 - **继续**：收到继续之后的事件，新内容接在这条消息下面出现（不是新的一条消息），过程条那一行回到运行中；滚动规则与生成中相同（用户在底部时跟随）。
 - **输入框**：有一个暂停中的中断、当前查看者可以回答时，输入框**锁定**；用户点卡片上的“输入其他内容”后输入框解锁并挂上“回答：<问题>”标签，发出的文字是这张卡的回答（经 `ActionTransport`），不是新消息。完整契约见 4.5。
@@ -191,22 +201,30 @@ final registry = BlockRegistry.withDefaults()          // 内置 10 种类型的
 - **中断在别处被关闭**（另一台设备已回答、过期、停止、块变成 `cancelled` / `superseded`）：任何状态 → `free`，控制器给出 `closedReason`（`answered_elsewhere` / `expired` / `stopped` / `withdrawn`）；草稿留在输入框里变回普通草稿，宿主据此提示一句，免得用户把它当成回答发出去。
 - 消息继续（`message.resumed`）后按生成中的普通规则处理。最终回答里带着问题（消息已经结束）**不**进入 `locked`。
 
-**宿主接线（草图，未编译）**
+多条消息同时暂停时，默认选择创建时间最近的消息；时间相同按消息 ID 降序。接入方可用 `selectInterrupt` 钩子选择。
+
+**宿主接线（草图，未编译；Flutter 类型由 Flutter 层适配）**
 
 ```dart
 final composer = InterruptComposerController(
-  store: blockStore, interactions: interactionController, actions: actionTransport,
+  store: blockStore,
+  interactions: interactionController,
   conversationId: conversationId,
-  lockPolicy: ComposerLockPolicy.answerers,   // 默认；也可 everyone / never
-)..attachDraft(myTextController);              // 草稿归宿主的输入框：锁定时不清空、✕ 时保留、被拒时放回、接受后清空
+  lockPolicy: ComposerLockPolicy.answerers,
+)..attachDraft(myDraftPort); // DraftPort 与状态流属于 Core；TextEditingController 由 Flutter 层适配。
 
-ValueListenableBuilder<InterruptComposerState>(
-  valueListenable: composer.state,
-  builder: (context, s, _) => switch (s) {
-    ComposerFree() => MyComposer(onSend: sendMessage),
-    ComposerLocked(:final hasDraft) => MyComposer(locked: true, hint: l10n.answerAboveFirst(hasDraft), onTapLocked: composer.revealInterrupt),
-    ComposerAnswering(:final question) => MyComposer(chip: InterruptAnswerChip(question: question, onClose: composer.cancelOtherInput), onSend: composer.submitOtherInput),
-    ComposerSubmitting(:final queued) => MyComposer(locked: true, chip: InterruptAnswerChip.pending(queued: queued)),
+StreamBuilder<InterruptComposerState>(
+  stream: composer.changes,
+  initialData: composer.state,
+  builder: (context, snapshot) {
+    final state = snapshot.data!;
+    return MyComposer(
+      locked: state.mode == ComposerMode.locked || state.mode == ComposerMode.submitting,
+      onTapLocked: composer.revealInterrupt,
+      onSend: state.mode == ComposerMode.answering
+          ? composer.submitOtherInput
+          : sendMessage,
+    );
   },
 );
 ```
@@ -239,6 +257,7 @@ class ChatWeaveThemeData {
 }
 ```
 
+- 默认文案由 `ChatWeaveLocalizations(locale: "zh" / "en", resolve: …, child: …)` 注入；`resolve(key, fallback)` 可覆盖库文案，协议正文、字段标签与服务端错误保持原文。
 - 通过 `ChatWeaveTheme(data: …, child: …)`（`InheritedWidget`）注入；`ChatWeaveTheme.of(context)` 读取。
 - 库自带两套中性默认主题 `ChatWeaveThemeData.neutralLight()` / `neutralDark()`，用于示例 App 与 golden 测试。宿主可以只实现浅色主题（例如宿主 v1 不做深色模式），系统切到深色时继续使用浅色主题即可。
 - `blockFrame` 让宿主不必重写每个组件，就能给所有组件统一“换外壳”；需要更深的定制时用注册表 `override` 替换单个组件。
@@ -267,7 +286,7 @@ class ChatWeaveThemeData {
 ## 7. 测试
 
 - **组件测试**：每个默认组件 × 正常 / 边界（最长标签、最多行、空数据）/ 降级 / 交互状态（open、提交中、已排队、resolved（这台设备答 / 另一台设备或群聊里别人先答 / 用户取消）、expired、cancelled（带原因）、superseded、只读）；生成中的消息 × 临时进度提示 / 正在停止；过程条 × 运行中 / 全部完成 / 有失败 / 暂停等你确认 / 回答后继续并完成（行尾显示回答）/ 暂停中停止 / 中断过期 / 子 Agent 收起与展开（含 3 层）/ 子 Agent 里的中断（委派行显示“等你确认”）/ 生成中停止 / 手动展开后不再自动收起 / 历史消息默认收起 / 最长标签 / 200% 字号；暂停中的消息 × 输入框 `locked` / `answering`（带标签）/ ✕ 返回且草稿保留 / `submitting`（在线、已排队）/ 被拒绝后放回文字 / 被另一台设备回答后回到 `free` / `otherInput: false` 时卡上没有入口 / 已结束消息里的问题不锁定；`InterruptComposerController` 的状态转换用纯 Dart 单元测试逐条覆盖。
-- **golden 截图**（把界面渲染成图片与基准图逐像素比对）：在示例 App 中，每个组件 × 中性浅色 / 深色主题 × 两种宽度（360、430）× 100% / 200% 字号；固定字体与工具链生成。
+- **golden 截图**（把界面渲染成图片与基准图逐像素比对）：在包内测试舞台（示例 App 在 T10 复用）中，每个组件 × 中性浅色 / 深色主题 × 两种宽度（360、430）× 100% / 200% 字号；固定字体与工具链生成。
 - **流式测试**：用一致性夹具驱动 `BlockStore`，断言每一步的组件树与最终 `fold` 结果；断言块类型在 `block.start` 后不变、已渲染的文字不会被替换成组件。
 - **无障碍测试**：`meetsGuideline(androidTapTargetGuideline)`、`textContrastGuideline`、语义树快照。
 
@@ -276,6 +295,6 @@ class ChatWeaveThemeData {
 `chatweave_flutter` 提供一个可选的 `ChatWeaveDebugOverlay`，帮助宿主开发者排查“为什么这条消息没续上 / 为什么这个块降级了”：
 
 - **严格只读**：只调用 `chatweave_core` 的 `inspect()` 拿快照，不写状态、不发请求、不碰宿主存储；打开或关闭它不会改变任何行为。
-- **内容**：每条消息的已应用 `seq`、`rev`、状态；块列表与各自的降级原因；续传状态（上次触发原因、结果、轮数）；进行中 / 已排队的动作与幂等键；最近 N 个（默认 50）`apply` 事件的环形缓冲，可按消息过滤。
+- **内容**：`BlockStore.inspect()` 汇总 `diagnostics.resume`（触发原因、轮数、阶段、已应用游标、错误码）与 `diagnostics.actions`（阶段、幂等键、错误码）；诊断元数据使用白名单，不接收 payload 或错误正文。每条消息的已应用 `seq`、`rev`、状态；块列表与各自的降级原因；续传状态（上次触发原因、结果、轮数）；进行中 / 已排队的动作与幂等键；最近 N 个（默认 50）`apply` 事件的环形缓冲，可按消息过滤。
 - **导出**：一键复制成 JSON 方便贴进问题报告，**默认去掉正文文本和块数据**，只保留 ID、类型、序号、状态和错误码；宿主显式允许时才包含内容。
 - **不进生产包**：宿主决定在哪些构建里启用以及怎么打开（例如只在调试构建里，用构建期常量控制，release 构建会被 tree-shake 掉）。库本身不提供任何默认的打开方式。

@@ -28,7 +28,7 @@ for number, line in enumerate(manifest.read_text().splitlines(), 1):
     if re.search(r'(?:^|[\s{,])(flutter|flutter_test|flutter_driver|flutter_web_plugins)\s*:', line.split('#', 1)[0]):
         errors.append(f'{manifest}:{number}: pure Dart core must not depend on Flutter')
 
-for path in sorted(core.rglob('*.dart')):
+for path in sorted((core / 'lib').rglob('*.dart')):
     if any(part in {'.dart_tool', 'build'} for part in path.parts):
         continue
     text = path.read_text()

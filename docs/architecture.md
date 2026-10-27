@@ -160,13 +160,27 @@ abstract interface class ChatWeaveStore {
   /// 来自宿主同步的持久化版本；rev >= 本地 rev 时替换。
   Future<void> saveFinal(Message message);
   Future<int?> lastSeq(String messageId);
-  /// 登出或切换用户时调用：清除聊天缓存、临时状态与续传进度。
+  Future<ClientState> loadClientState(String messageId);
+  Future<void> saveClientState(String messageId, ClientState state);
+  /// 登出或切换用户时调用：清除消息、游标、动作意图与停止标记。
   Future<void> clear();
 }
 
+class StreamConnection {
+  final int status;
+  final Map<String, String> headers;
+  final Stream<List<int>> bytes;
+  const StreamConnection({required this.status, required this.headers, required this.bytes});
+}
+
+abstract interface class AuthoritativeRefresh {
+  /// 触发权威同步，不能仅从本地缓存读取。
+  Future<Message?> refresh(String messageId);
+}
+
 abstract interface class StreamTransport {
-  /// 返回 SSE 响应的原始字节流；afterSeq 为 null 表示从头开始。
-  Stream<List<int>> open(String messageId, {int? afterSeq, required ClientCapabilities caps});
+  /// 返回 HTTP 状态、响应头和 SSE 原始字节流；解析字节前检查协议头。
+  Future<StreamConnection> open(String messageId, {int? afterSeq, required ClientCapabilities caps});
   /// 显式停止生成（幂等）。断线、切后台、离开页面都不调用它。
   Future<StopResult> stop(String messageId);
   /// 查询会话里正在生成的消息（App 在拿到消息 ID 之前被杀时用来接回）。
@@ -178,6 +192,8 @@ abstract interface class ActionTransport {
   Future<ActionSubmission> submit(ActionRequest request);
 }
 ```
+
+`ClientState` 保存 `stopRequested` 与按块索引的完整不可变 `ActionRequest` 意图；第一次发送前必须持久化，网络错误、超时、离线排队和重启后的重试复用原 ID 与 payload。停止标记持久化后才请求停止；恢复时有标记只做权威刷新，不自动续传。`AuthoritativeRefresh` 用于 rev 跳号、续传不可用及未知协议版本。Core 的输入框接口为 `DraftPort` 与纯 Dart 状态流，Flutter 类型由 Flutter 层适配。
 
 ### 3.4 客户端状态的几条硬规则
 

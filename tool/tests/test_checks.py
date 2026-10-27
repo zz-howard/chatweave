@@ -71,6 +71,13 @@ else:
                 result = self.run_check(check)
                 self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_io_import_in_core_test_is_allowed(self):
+        directory = self.root / 'dart/packages/chatweave_core/test'
+        directory.mkdir()
+        (directory / 'fixture_test.dart').write_text("import 'dart:io';\n")
+        result = self.run_check('check_deps')
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_flutter_import_in_core_is_rejected(self):
         path = self.root / 'dart/packages/chatweave_core/lib/core.dart'
         path.write_text("import 'package:flutter/widgets.dart';\n")

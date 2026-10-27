@@ -358,8 +358,8 @@ data: {"protocolVersion":"0.1","type":"block.start","messageId":"msg_01","seq":2
 | 重复事件 | `seq ≤ 已应用` 直接丢弃，天然幂等 |
 | `block.start` 重复的 `blockId` | 视为协议错误：该消息进入“需要快照”状态，客户端重连并请求快照 |
 | 对未开始的块发 `block.delta` / `data` | 同上 |
-| `block.delta` 用于非 markdown 块 | 忽略该事件并记一次告警（v1 不支持） |
-| `block.data` 发两次 | 第二次整体覆盖第一次（v1 生产方不应这样做） |
+| `block.delta` 用于非 markdown 块 | 拒绝：`invalid_delta`，从已应用游标恢复 |
+| `block.data` 发两次 | 拒绝：`duplicate_block_data`，不修改已应用状态 |
 | `block.patch` | 对块的 `{data, fallbackText, metadata}` 做 JSON Merge Patch；带 `rev` 时按 `rev` 规则判断是否应用 |
 | `message.end.blockCount` 与本地块数不符 | 本地缺块：请求快照或等同步结果替换 |
 | 同步送来的持久化版本 | `rev ≥ 本地 rev` 时整体替换本地版本（包括本地生成中的临时状态）；**临时状态永远不会覆盖持久化版本** |
