@@ -41,3 +41,5 @@
     当前倾向：服务端的第 16 条（protocol 4.8）只针对能回答这个中断的成员；等第一个群聊宿主的实际需求来确认。
 
 - **协议缺口：停止与回答副作用竞态**：服务端只给 `cancelled` 而没有 `state.reason.text` 时，客户端无法得知副作用是否已经执行；现有 ActionResult 状态不能替代最终业务说明。
+
+- **宿主自定义组件后代 Widget 的独立 rebuild 异常隔离。** 默认组件与注册表 builder 内的异常已逐块降级；宿主返回的后代 Widget 后续独立 rebuild 由 Flutter 自行捕获，当前可能显示 ErrorWidget，不能保证触发块级 fallback / onBlockRenderError。宿主在自定义组件自己的 build 中处理预期异常；待验证无需全局错误钩子的完整隔离方案。

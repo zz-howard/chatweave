@@ -146,8 +146,14 @@ pub trait ActionStore<Ctx>: Send + Sync {
 
 | 包 | 提供 | 宿主要实现 |
 |---|---|---|
-| `chatweave_core` | 不可变模型类（手写 `fromJson` / `toJson`，**不依赖 build_runner**，减少宿主的依赖负担）；`SseDecoder`（字节流 → SSE 帧，可接任何 HTTP 客户端的字节流）；`EventParser`；`BlockStore`（单一写入口，按 `seq` 去重、按块 ID 合并、运行步骤与块分开保存、`rev` 规则、与持久化版本对账、按消息 `id` 对账乐观用户消息——用户消息 ID 由客户端生成）；`StreamController`（续传状态机、触发时机、退避与上限、“已请求停止”状态、临时进度提示、按会话找回正在生成的消息）；`InteractionController`（交互块的本地显示状态与幂等键）；`InterruptComposerController`（暂停时输入框的锁定 / 回答状态，[rendering.md 4.5](rendering.md#45-输入框联动composer-契约)）；`ViewportController`（纯函数的滚动状态机）；`inspect()` 只读快照；`Limits` 检查；`MemoryTransport` / `ScriptedTransport` 与宿主实现一致性套件 | `ChatWeaveStore`（持久化消息与续传进度，例如用 drift）、`StreamTransport`（打开 SSE 字节流，例如用 dio）、`ActionTransport`（提交动作，例如走离线队列；可以不提供，此时交互块只读） |
+| `chatweave_core` | 不可变模型类（手写 `fromJson` / `toJson`，**不依赖 build_runner**，减少宿主的依赖负担）；`SseDecoder`（字节流 → SSE 帧，可接任何 HTTP 客户端的字节流）；`EventParser`；`BlockStore`（单一写入口，按 `seq` 去重、按块 ID 合并、运行步骤与块分开保存、`rev` 规则、与持久化版本对账、按消息 `id` 对账乐观用户消息——用户消息 ID 由客户端生成）；`ChatWeaveStreamController`（续传状态机、触发时机、退避与上限、“已请求停止”状态、临时进度提示、按会话找回正在生成的消息）；`InteractionController`（交互块的本地显示状态与幂等键）；`InterruptComposerController`（暂停时输入框的锁定 / 回答状态，[rendering.md 4.5](rendering.md#45-输入框联动composer-契约)）；`ViewportController`（纯函数的滚动状态机）；`inspect()` 只读快照；`Limits` 检查；`MemoryTransport` / `ScriptedTransport` 与宿主实现一致性套件 | `ChatWeaveStore`（持久化消息与续传进度，例如用 drift）、`StreamTransport`（打开 SSE 字节流，例如用 dio）、`ActionTransport`（提交动作，例如走离线队列；可以不提供，此时交互块只读） |
 | `chatweave_flutter` | `ChatWeaveList`（消息列表）、`ChatWeaveComposer`（输入框，含中断时的锁定与“回答”标签 `InterruptAnswerChip`）、`MessageView`（含正文之上的运行过程条 `ProcessStrip`）、`MarkdownBlockView`（基于 `flutter_markdown_plus` 的受限子集）、`BlockRegistry`（含按块的错误隔离）、默认组件、`ChatWeaveTheme` 主题接口与中性浅色 / 深色默认主题；可选的只读调试面板 `ChatWeaveDebugOverlay` | `ChatWeaveThemeData` 的实现（品牌皮肤）、自定义块组件（例如业务卡片）、可选的用户消息 / 消息外框构建器 |
+
+公开续传控制器名为 `ChatWeaveStreamController`，可与 `dart:async.StreamController` 同时导入。内存适配器 `MemoryStore`、`MemoryTransport`、`ScriptedTransport` 与宿主契约测试只从 `package:chatweave_core/testing.dart` 导入，主库不导出内存实现。
+
+续传预算只限制连续失败：应用取得进展的事件后清空轮数与失败窗口；`transport.open` 有独立超时（默认 30 秒），超时进入失败退避。最终 rev 经任一同步路径到达时结束该消息实时订阅，rev 0 快照不能覆盖最终版本。停止先持久化 stopRequested，保留实时连接，权威刷新按退避持续重试直到最终 rev 或控制器销毁；重启后恢复停止标记会继续确认最终状态。`ChatWeaveList` 点按停止后立即禁用按钮，宿主可用 `stopRequested` 集合传入持久化恢复的标记。
+
+动作控制器配置 `onRefresh` 为权威同步并应用结果；消息恢复后宿主调用 `await interactions.restore(messageId)`，库自动刷新并使用持久化 ID / payload 重试。组件重建不调用 restore。自动重试默认 3 次并有退避，耗尽后进入 retryable，默认卡片提供 retry 入口；明确拒绝后新意图仍可生成新 ID。
 
 存储接口草图（示意）：
 

@@ -76,7 +76,7 @@ T0 ─┬─ T1 ─┬─ T2 ─┬─ T3 ─┐
 - **目标**：客户端协议核心，纯 Dart。
 - **主要模块**：`dart/packages/chatweave_core`。
 - **依赖**：T1。
-- **产物**：模型类（手写序列化）；`SseDecoder`；`EventParser`；`BlockStore`（单一写入口 `apply`、结构共享、seq 去重、按块合并、Merge Patch、`rev` 规则、持久化版本对账、乐观用户消息按 `id` 对账）；`StreamController`（续传状态机、触发时机、单飞、轮数上限、退避、心跳超时、“已请求停止”不自动重连、“已暂停”不自动重连及其重新订阅条件、临时进度提示、活动消息查询）；运行步骤的折叠（与块分开保存，含嵌套与暂停 / 继续）与过程条的本地展开状态（整条与每个委派步骤）；当前暂停中的中断（供输入框使用）；`InteractionController`；`ViewportController`（纯函数）；`inspect()` 只读快照与事件环形缓冲；`ChatWeaveStore` / `StreamTransport` / `ActionTransport` 接口与内存实现、`ScriptedTransport`；宿主实现一致性套件；`Limits`。
+- **产物**：模型类（手写序列化）；`SseDecoder`；`EventParser`；`BlockStore`（单一写入口 `apply`、结构共享、seq 去重、按块合并、Merge Patch、`rev` 规则、持久化版本对账、乐观用户消息按 `id` 对账）；`ChatWeaveStreamController`（续传状态机、触发时机、单飞、轮数上限、退避、心跳超时、“已请求停止”不自动重连、“已暂停”不自动重连及其重新订阅条件、临时进度提示、活动消息查询）；运行步骤的折叠（与块分开保存，含嵌套与暂停 / 继续）与过程条的本地展开状态（整条与每个委派步骤）；当前暂停中的中断（供输入框使用）；`InteractionController`；`ViewportController`（纯函数）；`inspect()` 只读快照与事件环形缓冲；`ChatWeaveStore` / `StreamTransport` / `ActionTransport` 接口与内存实现、`ScriptedTransport`；宿主实现一致性套件；`Limits`。
 - **验收**：同一批一致性夹具全部通过（与 Rust 的 `fold` 结果一致）；SSE 解码对任意切分的字节流（逐字节、跨帧切分）结果相同；续传状态机的属性测试（随机插入重复、断线）最终状态等于期望消息；重复事件不触发通知且返回同一对象；同一消息的多个续传触发只产生一次连接；`ViewportController` 的单元测试（插入历史、组件变高时锚点不动）；内存实现通过一致性套件，故意写坏的实现被套件发现；`pubspec.yaml` 不含 Flutter，源码不导入 `dart:io`。
 
 ### T6 Flutter：主题接口、Markdown、注册表与降级
