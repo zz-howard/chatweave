@@ -1,4 +1,5 @@
 import 'package:chatweave_core/chatweave_core.dart';
+import 'package:chatweave_core/testing.dart';
 import 'package:test/test.dart';
 
 Message paused(String id,
@@ -73,6 +74,7 @@ void main() {
   test('composer_lock_answer_cancel_preserves_draft', () {
     final store = BlockStore()..apply(SyncMessage(paused('m')));
     final interactions = InteractionController(
+        maxAutomaticRetries: 0,
         store: store,
         persistence: MemoryStore(),
         nextId: () => 'a',
@@ -96,6 +98,7 @@ void main() {
     final store = BlockStore()
       ..apply(SyncMessage(paused('m', otherInput: false)));
     final interactions = InteractionController(
+        maxAutomaticRetries: 0,
         store: store,
         persistence: MemoryStore(),
         nextId: () => 'a',
@@ -111,6 +114,7 @@ void main() {
       ..apply(SyncMessage(paused('b')))
       ..apply(SyncMessage(paused('c', createdAt: '2026-10-25T09:30:00Z')));
     final interactions = InteractionController(
+        maxAutomaticRetries: 0,
         store: store,
         persistence: MemoryStore(),
         nextId: () => 'a',
@@ -129,7 +133,10 @@ void main() {
     test('composer_lock_policy_${policy.name}', () {
       final store = BlockStore()..apply(SyncMessage(paused('m')));
       final interactions = InteractionController(
-          store: store, persistence: MemoryStore(), nextId: () => 'a');
+          maxAutomaticRetries: 0,
+          store: store,
+          persistence: MemoryStore(),
+          nextId: () => 'a');
       final controller = InterruptComposerController(
           store: store,
           interactions: interactions,
@@ -152,6 +159,7 @@ void main() {
       final store = BlockStore()..apply(SyncMessage(paused('m')));
       final persistence = MemoryStore();
       final interactions = InteractionController(
+          maxAutomaticRetries: 0,
           store: store,
           persistence: persistence,
           nextId: () => 'a',
@@ -221,6 +229,7 @@ void main() {
               })),
       ]);
       final interactions = InteractionController(
+          maxAutomaticRetries: 0,
           store: store,
           persistence: persistence,
           nextId: () => 'a',
@@ -248,6 +257,7 @@ void main() {
   test('closed_elsewhere_keeps_draft', () {
     final store = BlockStore()..apply(SyncMessage(paused('m')));
     final interactions = InteractionController(
+        maxAutomaticRetries: 0,
         store: store,
         persistence: MemoryStore(),
         nextId: () => 'a',

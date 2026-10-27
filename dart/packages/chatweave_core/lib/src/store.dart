@@ -1,7 +1,7 @@
 import 'dart:async' as async;
-
 import 'fold.dart';
 import 'model.dart';
+import 'validation.dart';
 
 sealed class StoreEvent {
   const StoreEvent();
@@ -80,6 +80,11 @@ class BlockStore {
         if ((messages[id]?.rev ?? 0) > 0 &&
             type != 'block.patch' &&
             type != 'message.snapshot') return _snapshot;
+        if ((messages[id]?.rev ?? 0) > 0 &&
+            type == 'message.snapshot' &&
+            (object(event['message'])['rev'] as int? ?? 0) == 0) {
+          return _snapshot;
+        }
         final state = _folds.putIfAbsent(id, FoldState.new);
         if (!state.apply(event)) return _snapshot;
         final candidate = state.message;
@@ -100,6 +105,7 @@ class BlockStore {
         if (old != null && jsonEquals(old.json, message.json)) {
           return _snapshot;
         }
+        checkConsumerBlocks(message);
         messages[id] = message;
         final seq = message['lastSeq'] as int? ?? cursors[id];
         if (seq != null && seq > 0) {
@@ -130,6 +136,7 @@ class BlockStore {
         final next =
             Message.fromJson({...old.json, 'rev': rev, 'blocks': blocks});
         const Limits().checkBytes(next.json, const Limits().maxMessageBytes);
+        checkConsumerBlocks(next);
         messages[id] = next;
         final seq = cursors[id];
         if (seq != null) _folds[id] = FoldState()..restore(next, seq);

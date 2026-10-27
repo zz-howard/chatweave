@@ -7,4 +7,3 @@ export 'src/stream_controller.dart';
 export 'src/interaction.dart';
 export 'src/viewport.dart';
 export 'src/validation.dart';
-export 'src/memory_transport.dart';

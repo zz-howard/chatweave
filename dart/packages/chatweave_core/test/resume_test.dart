@@ -2,8 +2,8 @@ import 'dart:async' as async;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-
 import 'package:chatweave_core/chatweave_core.dart';
+import 'package:chatweave_core/testing.dart';
 import 'package:test/test.dart';
 
 List<Json> streamFixture(String name) => File(
@@ -44,7 +44,7 @@ void main() {
     final events = streamFixture('01-markdown');
     final transport =
         ScriptedTransport(connections: [(_, __) async => connection(events)]);
-    final controller = StreamController(
+    final controller = ChatWeaveStreamController(
         store: BlockStore(),
         persistence: MemoryStore(),
         transport: transport,
@@ -74,7 +74,7 @@ void main() {
         },
       ]);
       final store = BlockStore();
-      final controller = StreamController(
+      final controller = ChatWeaveStreamController(
           store: store,
           persistence: MemoryStore(),
           transport: transport,
@@ -107,7 +107,7 @@ void main() {
       },
     ]);
     final store = BlockStore();
-    final controller = StreamController(
+    final controller = ChatWeaveStreamController(
         store: store,
         persistence: MemoryStore(),
         transport: transport,
@@ -124,8 +124,9 @@ void main() {
     await persistence.saveClientState(
         'msg_weather', ClientState(stopRequested: true));
     final transport = ScriptedTransport(connections: []);
-    final authority = Authority(null);
-    final controller = StreamController(
+    final authority =
+        Authority(fold(streamFixture('01-markdown').map(StreamEvent.fromJson)));
+    final controller = ChatWeaveStreamController(
         store: BlockStore(),
         persistence: persistence,
         transport: transport,
@@ -135,7 +136,7 @@ void main() {
       await controller.subscribe('msg_weather', trigger: trigger);
     }
     expect(transport.opens, isEmpty);
-    expect(authority.calls, ResumeTrigger.values.length);
+    expect(authority.calls, 1);
     await controller.dispose();
   });
   test('paused_requires_explicit_resume_condition', () async {
@@ -143,7 +144,7 @@ void main() {
         fold(streamFixture('24-interrupt-paused').map(StreamEvent.fromJson));
     final store = BlockStore()..apply(SyncMessage(paused));
     final transport = ScriptedTransport(connections: []);
-    final controller = StreamController(
+    final controller = ChatWeaveStreamController(
         store: store,
         persistence: MemoryStore(),
         transport: transport,
@@ -168,7 +169,7 @@ void main() {
           headers: const {'ChatWeave-Protocol': '9.0'},
           bytes: async.Stream.error(StateError('must not read body')))
     ]);
-    final controller = StreamController(
+    final controller = ChatWeaveStreamController(
         store: BlockStore(),
         persistence: MemoryStore(),
         transport: transport,
@@ -193,7 +194,7 @@ void main() {
       },
     ]);
     final store = BlockStore();
-    final controller = StreamController(
+    final controller = ChatWeaveStreamController(
         store: store,
         persistence: MemoryStore(),
         transport: transport,
@@ -230,7 +231,7 @@ void main() {
         'lastSeq': 999,
       })
     ];
-    final controller = StreamController(
+    final controller = ChatWeaveStreamController(
         store: store,
         persistence: MemoryStore(),
         transport: transport,
@@ -248,7 +249,7 @@ void main() {
     final transport = ScriptedTransport(connections: [
       for (var i = 0; i < 3; i++) (_, __) async => throw StateError('offline'),
     ]);
-    final controller = StreamController(
+    final controller = ChatWeaveStreamController(
         store: BlockStore(),
         persistence: MemoryStore(),
         transport: transport,
@@ -293,7 +294,7 @@ void main() {
       },
     ]);
     final store = BlockStore();
-    final controller = StreamController(
+    final controller = ChatWeaveStreamController(
         store: store,
         persistence: MemoryStore(),
         transport: transport,

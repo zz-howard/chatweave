@@ -15,7 +15,38 @@ const builtinTypes = {
 };
 
 /// Consumer checks preserve unknown fields and let unknown block types degrade.
+final _blockChecks = Expando<Object>();
+final _validBlockRevision = Object();
+
+/// Immutable block JSON identity is its local revision. Both successes and
+/// failures are cached; changing any block content produces a new revision.
 void validateBlock(Json b, {Limits limits = const Limits()}) {
+  if (!identical(limits, const Limits())) {
+    _validateBlock(b, limits: limits);
+    return;
+  }
+  b = object(freeze(b));
+  final cached = _blockChecks[b];
+  if (identical(cached, _validBlockRevision)) return;
+  if (cached != null) throw cached;
+  try {
+    _validateBlock(b, limits: limits);
+    _blockChecks[b] = _validBlockRevision;
+  } catch (error) {
+    _blockChecks[b] = error;
+    rethrow;
+  }
+}
+
+void checkConsumerBlocks(Message message, {Limits limits = const Limits()}) {
+  for (final block in message.blocks) {
+    try {
+      validateBlock(block.json, limits: limits);
+    } catch (_) {/* Block-local fallback. */}
+  }
+}
+
+void _validateBlock(Json b, {Limits limits = const Limits()}) {
   limits.checkBlock(b);
   if (b['id'] is! String ||
       b['type'] is! String ||

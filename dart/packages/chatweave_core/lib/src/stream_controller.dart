@@ -12,33 +12,45 @@ enum ResumeTrigger {
   heartbeat,
   action,
   activeChanged,
-  checkpoint
+  checkpoint,
 }
 
 class ResumePolicy {
-  const ResumePolicy(
-      {this.maxRounds = 5,
-      this.maxElapsed = const Duration(minutes: 2),
-      this.heartbeatTimeout = const Duration(seconds: 45)});
+  const ResumePolicy({
+    this.maxRounds = 5,
+    this.maxElapsed = const Duration(minutes: 2),
+    this.openTimeout = const Duration(seconds: 30),
+    this.heartbeatTimeout = const Duration(seconds: 45),
+  });
   final int maxRounds;
   final Duration maxElapsed;
   final Duration heartbeatTimeout;
+  final Duration openTimeout;
   Duration delay(int round) =>
       Duration(milliseconds: 250 * (1 << round.clamp(0, 6).toInt()));
 }
 
-class StreamController {
-  StreamController(
-      {required this.store,
-      required this.persistence,
-      required this.transport,
-      required this.authority,
-      required this.caps,
-      this.policy = const ResumePolicy(),
-      async.Future<void> Function(Duration)? wait,
-      DateTime Function()? now})
-      : _wait = wait ?? async.Future<void>.delayed,
-        _now = now ?? DateTime.now;
+class ChatWeaveStreamController {
+  ChatWeaveStreamController({
+    required this.store,
+    required this.persistence,
+    required this.transport,
+    required this.authority,
+    required this.caps,
+    this.policy = const ResumePolicy(),
+    async.Future<void> Function(Duration)? wait,
+    DateTime Function()? now,
+  })  : _wait = wait ?? async.Future<void>.delayed,
+        _now = now ?? DateTime.now {
+    _storeSub = store.changes.listen((snapshot) {
+      for (final entry in snapshot.messages.entries) {
+        if (entry.value.rev > 0) {
+          final done = _completions[entry.key];
+          if (done != null && !done.isCompleted) done.complete();
+        }
+      }
+    });
+  }
   final BlockStore store;
   final ChatWeaveStore persistence;
   final StreamTransport transport;
@@ -52,6 +64,25 @@ class StreamController {
   final _subscriptions = <String, async.StreamSubscription<StreamEvent>>{};
   final _completions = <String, async.Completer<void>>{};
   bool _disposed = false;
+  late final async.StreamSubscription<StoreSnapshot> _storeSub;
+  final _stopping = <String, async.Future<void>>{};
+
+  async.Future<void> _settleStop(String id) => _stopping.putIfAbsent(id, () {
+        return async.Future<void>.microtask(() async {
+          var attempt = 0;
+          while (!_disposed && (store.snapshot.messages[id]?.rev ?? 0) == 0) {
+            try {
+              await refresh(id).timeout(policy.openTimeout);
+            } catch (_) {
+              /* Retry uncertainty. */
+            }
+            if ((store.snapshot.messages[id]?.rev ?? 0) > 0) return;
+            await _wait(policy.delay(attempt++));
+          }
+        }).whenComplete(() {
+          _stopping.remove(id);
+        });
+      });
 
   async.Future<void> subscribe(
     String messageId, {
@@ -60,10 +91,12 @@ class StreamController {
     if (_disposed) return async.Future.value();
     return _flights.putIfAbsent(messageId, () {
       // A microtask ensures the flight is installed before any adapter runs.
-      final flight =
-          async.Future<void>.microtask(() => _run(messageId, trigger));
+      final flight = async.Future<void>.microtask(
+        () => _run(messageId, trigger),
+      );
       return flight.whenComplete(() {
         _flights.remove(messageId);
+        _completions.remove(messageId);
       });
     });
   }
@@ -75,8 +108,10 @@ class StreamController {
       if (message.rev > 0) {
         await persistence.saveFinal(message);
       } else {
-        await persistence.saveProvisional(message,
-            lastSeq: message['lastSeq'] as int? ?? 0);
+        await persistence.saveProvisional(
+          message,
+          lastSeq: message['lastSeq'] as int? ?? 0,
+        );
       }
     }
   }
@@ -85,11 +120,11 @@ class StreamController {
     store.recordDiagnostic('resume', id, {
       'trigger': trigger.name,
       'phase': 'checking',
-      'seq': store.snapshot.cursors[id]
+      'seq': store.snapshot.cursors[id],
     });
     final client = await persistence.loadClientState(id);
     if (client.stopRequested) {
-      await refresh(id);
+      await _settleStop(id);
       return;
     }
     if (store.snapshot.messages[id] == null) {
@@ -106,21 +141,40 @@ class StreamController {
         }.contains(trigger)) return;
     final epoch = (_epochs[id] ?? 0) + 1;
     _epochs[id] = epoch;
-    final began = _now();
-    for (var round = 0; round < policy.maxRounds; round++) {
+    DateTime? began;
+    var round = 0;
+    while (round < policy.maxRounds) {
       if (_disposed || _epochs[id] != epoch) return;
-      if ((await persistence.loadClientState(id)).stopRequested) return;
+      final failureStart = began;
+      if (failureStart != null &&
+          _now().difference(failureStart) >= policy.maxElapsed) break;
+      if ((await persistence.loadClientState(id)).stopRequested) {
+        await _settleStop(id);
+        return;
+      }
+      if ((store.snapshot.messages[id]?.rev ?? 0) > 0) return;
       try {
         store.recordDiagnostic('resume', id, {
           'trigger': trigger.name,
           'round': round + 1,
           'phase': 'connecting',
-          'seq': store.snapshot.cursors[id]
+          'seq': store.snapshot.cursors[id],
         });
-        final connection = await transport.open(id,
-            afterSeq: store.snapshot.cursors[id], caps: caps);
-        final headers =
-            connection.headers.map((k, v) => MapEntry(k.toLowerCase(), v));
+        final done = async.Completer<void>();
+        _completions[id] = done;
+        final connection = await async.Future.any<StreamConnection?>([
+          transport
+              .open(id, afterSeq: store.snapshot.cursors[id], caps: caps)
+              .timeout(policy.openTimeout),
+          done.future.then<StreamConnection?>((_) => null),
+        ]);
+        if (connection == null) return;
+        if (_disposed ||
+            _epochs[id] != epoch ||
+            (store.snapshot.messages[id]?.rev ?? 0) > 0) return;
+        final headers = connection.headers.map(
+          (k, v) => MapEntry(k.toLowerCase(), v),
+        );
         if (connection.status == 204 ||
             connection.status != 200 ||
             headers['chatweave-protocol'] != '0.1') {
@@ -132,33 +186,41 @@ class StreamController {
             .timeout(policy.heartbeatTimeout)
             .transform(const SseDecoder())
             .map(const EventParser().parse);
-        final done = async.Completer<void>();
-        _completions[id] = done;
-        final sub = events.listen((event) {
-          if (_disposed || _epochs[id] != epoch || done.isCompleted) return;
-          try {
-            if (event.messageId != id)
-              throw const ProtocolError('message_mismatch');
-            // A replayed pause/end must not retire the new connection.
-            if (event.type != 'message.snapshot' &&
-                event.seq != null &&
-                event.seq! <= (store.snapshot.cursors[id] ?? 0)) return;
-            store.apply(ApplyStream(event));
-            if (event.type == 'error' &&
-                object(event['error'])['code'] == 'resume_unavailable') {
-              throw const ProtocolError('resume_unavailable');
+        final sub = events.listen(
+          (event) {
+            if (_disposed || _epochs[id] != epoch || done.isCompleted) return;
+            try {
+              if (event.messageId != id)
+                throw const ProtocolError('message_mismatch');
+              // A replayed pause/end must not retire the new connection.
+              if (event.type != 'message.snapshot' &&
+                  event.seq != null &&
+                  event.seq! <= (store.snapshot.cursors[id] ?? 0)) return;
+              final before = store.snapshot;
+              store.apply(ApplyStream(event));
+              if (!identical(before, store.snapshot)) {
+                began = null;
+                round = 0;
+              }
+              if (event.type == 'error' &&
+                  object(event['error'])['code'] == 'resume_unavailable') {
+                throw const ProtocolError('resume_unavailable');
+              }
+              if (event.type == 'message.paused' ||
+                  event.type == 'message.end') {
+                if (!done.isCompleted) done.complete();
+              }
+            } catch (error, stack) {
+              if (!done.isCompleted) done.completeError(error, stack);
             }
-            if (event.type == 'message.paused' || event.type == 'message.end') {
-              done.complete();
-            }
-          } catch (error, stack) {
-            done.completeError(error, stack);
-          }
-        }, onError: (Object error, StackTrace stack) {
-          if (!done.isCompleted) done.completeError(error, stack);
-        }, onDone: () {
-          if (!done.isCompleted) done.complete();
-        });
+          },
+          onError: (Object error, StackTrace stack) {
+            if (!done.isCompleted) done.completeError(error, stack);
+          },
+          onDone: () {
+            if (!done.isCompleted) done.complete();
+          },
+        );
         _subscriptions[id] = sub;
         try {
           await done.future;
@@ -175,19 +237,21 @@ class StreamController {
               'trigger': trigger.name,
               'round': round + 1,
               'phase': message.status,
-              'seq': store.snapshot.cursors[id]
+              'seq': store.snapshot.cursors[id],
             });
             await persistence.saveFinal(message);
             return;
           }
-          await persistence.saveProvisional(message,
-              lastSeq: store.snapshot.cursors[id] ?? 0);
+          await persistence.saveProvisional(
+            message,
+            lastSeq: store.snapshot.cursors[id] ?? 0,
+          );
           if (message.status == 'paused') {
             store.recordDiagnostic('resume', id, {
               'trigger': trigger.name,
               'round': round + 1,
               'phase': 'paused',
-              'seq': store.snapshot.cursors[id]
+              'seq': store.snapshot.cursors[id],
             });
             return;
           }
@@ -198,31 +262,39 @@ class StreamController {
           'round': round + 1,
           'phase': 'error',
           'code': error.code,
-          'seq': store.snapshot.cursors[id]
+          'seq': store.snapshot.cursors[id],
         });
-        if (const {'resume_unavailable', 'rev_gap', 'unsupported_protocol'}
-            .contains(error.code)) {
+        if (const {
+          'resume_unavailable',
+          'rev_gap',
+          'unsupported_protocol',
+        }.contains(error.code)) {
           await refresh(id);
           return;
         }
       } catch (_) {
         // Transport uncertainty resumes only from the last successfully applied seq.
       }
-      if (_now().difference(began) >= policy.maxElapsed) break;
+      began ??= _now();
+      if (_now().difference(began!) >= policy.maxElapsed) break;
       await _wait(policy.delay(round));
+      round++;
     }
     if (!_disposed && _epochs[id] == epoch) await refresh(id);
   }
 
   async.Future<void> stop(String id) async {
     await updateClientState(
-        persistence, id, (state) => state.copyWith(stopRequested: true));
-    _epochs[id] = (_epochs[id] ?? 0) + 1;
-    final done = _completions.remove(id);
-    if (done != null && !done.isCompleted) done.complete();
-    await _subscriptions.remove(id)?.cancel();
-    await transport.stop(id);
-    await refresh(id);
+      persistence,
+      id,
+      (state) => state.copyWith(stopRequested: true),
+    );
+    try {
+      await transport.stop(id).timeout(policy.openTimeout);
+    } catch (_) {
+      // The stop may already have reached the server. Confirm authoritative state.
+    }
+    await _settleStop(id);
   }
 
   async.Future<void> acceptCheckpoint(Message message) async {
@@ -238,18 +310,24 @@ class StreamController {
 
   async.Future<void> recoverConversation(String conversationId) async {
     final activeMessages = await transport.activeMessages(conversationId);
-    await async.Future.wait(activeMessages.map((active) {
-      final local = store.snapshot.messages[active.id];
-      final changed = local?.status == 'paused' && active['status'] != 'paused';
-      return subscribe(active.id,
+    await async.Future.wait(
+      activeMessages.map((active) {
+        final local = store.snapshot.messages[active.id];
+        final changed =
+            local?.status == 'paused' && active['status'] != 'paused';
+        return subscribe(
+          active.id,
           trigger: changed
               ? ResumeTrigger.activeChanged
-              : ResumeTrigger.conversation);
-    }));
+              : ResumeTrigger.conversation,
+        );
+      }),
+    );
   }
 
   async.Future<void> dispose() async {
     _disposed = true;
+    await _storeSub.cancel();
     for (final done in _completions.values) {
       if (!done.isCompleted) done.complete();
     }

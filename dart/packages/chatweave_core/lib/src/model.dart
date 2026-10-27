@@ -177,9 +177,9 @@ class Limits {
     }
   }
 
-  void checkEvent(Json event) {
+  void checkEvent(Json event, {bool checkBlockData = true}) {
     checkBytes(event, maxEventBytes);
-    if (event.containsKey('data')) checkData(event['data']);
+    if (checkBlockData && event.containsKey('data')) checkData(event['data']);
     final delta = event['delta'];
     if (delta is Map<Object?, Object?> &&
         delta['text'] is String &&

@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'model.dart';
 import 'ports.dart';
 import 'store.dart';
@@ -20,6 +19,7 @@ enum InteractionPhase {
   submitting,
   queued,
   confirming,
+  retryable,
   rejected,
   accepted
 }
@@ -49,7 +49,10 @@ class InteractionController {
       this.onResume,
       this.onFollowUp,
       this.onRefresh,
-      this.timeout = const Duration(seconds: 30)});
+      this.timeout = const Duration(seconds: 30),
+      this.maxAutomaticRetries = 3,
+      Future<void> Function(Duration)? wait})
+      : _wait = wait ?? Future<void>.delayed;
   final BlockStore store;
   final ChatWeaveStore persistence;
   final String Function() nextId;
@@ -58,6 +61,10 @@ class InteractionController {
   final Future<void> Function(String)? onFollowUp;
   final Future<void> Function(String)? onRefresh;
   final Duration timeout;
+  final int maxAutomaticRetries;
+  final Future<void> Function(Duration) _wait;
+  final _attempts = <String, int>{};
+  bool _disposed = false;
   final _states = <String, InteractionState>{};
   final _flights = <String, Future<void>>{};
   final _changes = StreamController<void>.broadcast(sync: true);
@@ -66,6 +73,7 @@ class InteractionController {
   InteractionState stateFor(String messageId, String blockId) =>
       _states[_key(messageId, blockId)] ?? const InteractionState();
   void _set(String key, InteractionState state) {
+    if (_disposed) return;
     _states[key] = state;
     store.recordDiagnostic('actions', key,
         {'phase': state.phase.name, 'actionId': state.request?['id']});
@@ -80,6 +88,11 @@ class InteractionController {
           InteractionState(
               phase: InteractionPhase.confirming, request: entry.value));
     }
+    try {
+      final refresh = onRefresh?.call(messageId);
+      if (refresh != null) await refresh.timeout(timeout);
+    } catch (_) {/* Retry saved intent. */}
+    await retryPending(messageId);
   }
 
   Future<void> submit(
@@ -88,7 +101,7 @@ class InteractionController {
     Json payload, {
     bool canAnswer = true,
   }) {
-    if (transport == null || !canAnswer) return Future.value();
+    if (_disposed || transport == null || !canAnswer) return Future.value();
     final key = _key(messageId, blockId);
     if (stateFor(messageId, blockId).locked)
       return _flights[key] ?? Future.value();
@@ -102,6 +115,7 @@ class InteractionController {
     // Lock synchronously; durable recovery happens before allocating a new ID.
     _set(key, const InteractionState(phase: InteractionPhase.submitting));
     return _single(key, () async {
+      _attempts[key] = 0;
       ActionRequest? request;
       await updateClientState(persistence, messageId, (saved) {
         request = saved.intents[blockId] ??
@@ -138,12 +152,15 @@ class InteractionController {
   }
 
   Future<void> retry(String messageId, String blockId) async {
-    if (transport == null) return;
+    if (_disposed || transport == null) return;
     final key = _key(messageId, blockId);
     final request = stateFor(messageId, blockId).request ??
         (await persistence.loadClientState(messageId)).intents[blockId];
     if (request == null) return;
-    await _single(key, () => _send(messageId, blockId, request));
+    await _single(key, () async {
+      _attempts[key] = 0;
+      await _send(messageId, blockId, request);
+    });
   }
 
   Future<void> retryPending(String messageId) async {
@@ -156,6 +173,23 @@ class InteractionController {
       String messageId, String blockId, ActionRequest request) async {
     final key = _key(messageId, blockId);
     try {
+      final block = store.snapshot.messages[messageId]?.blocks
+          .where((b) => b.id == blockId)
+          .firstOrNull;
+      if (block != null &&
+          (object(block.data['state'] ?? <String, Object?>{})['status'] ??
+                  'open') !=
+              'open') {
+        await updateClientState(persistence, messageId, (saved) {
+          final intents = {...saved.intents}..remove(blockId);
+          return saved.copyWith(intents: intents);
+        });
+        _set(
+            key,
+            InteractionState(
+                phase: InteractionPhase.accepted, request: request));
+        return;
+      }
       final submission = await transport!.submit(request).timeout(timeout);
       if (submission.queued) {
         _set(key,
@@ -225,10 +259,47 @@ class InteractionController {
       String key, String messageId, ActionRequest request) async {
     _set(key,
         InteractionState(phase: InteractionPhase.confirming, request: request));
-    await onRefresh?.call(messageId);
+    try {
+      final refresh = onRefresh?.call(messageId);
+      if (refresh != null) await refresh.timeout(timeout);
+    } catch (_) {/* Still uncertain. */}
+    if (_disposed) return;
+    final blockId = object(request['context'])['blockId'] as String;
+    final block = store.snapshot.messages[messageId]?.blocks
+        .where((b) => b.id == blockId)
+        .firstOrNull;
+    if (block != null &&
+        (object(block.data['state'] ?? <String, Object?>{})['status'] ??
+                'open') !=
+            'open') {
+      await updateClientState(persistence, messageId, (saved) {
+        final intents = {...saved.intents}..remove(blockId);
+        return saved.copyWith(intents: intents);
+      });
+      _set(key,
+          InteractionState(phase: InteractionPhase.accepted, request: request));
+      return;
+    }
+    final attempt = _attempts[key] ?? 0;
+    if (attempt >= maxAutomaticRetries) {
+      _set(
+          key,
+          InteractionState(
+              phase: InteractionPhase.retryable,
+              request: request,
+              error: '暂时无法确认结果，请重试'));
+      return;
+    }
+    _attempts[key] = attempt + 1;
+    await _wait(
+        Duration(milliseconds: 250 * (1 << attempt.clamp(0, 6).toInt())));
+    if (!_disposed) await _send(messageId, blockId, request);
   }
 
-  Future<void> dispose() => _changes.close();
+  Future<void> dispose() {
+    _disposed = true;
+    return _changes.close();
+  }
 }
 
 enum ComposerMode { free, locked, answering, submitting }

@@ -1,7 +1,6 @@
 import 'dart:async' as async;
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:chatweave_core/chatweave_core.dart';
 import 'package:chatweave_core/testing.dart';
 import 'package:test/test.dart';
@@ -34,6 +33,7 @@ void main() {
     ]);
     var ids = 0;
     final controller = InteractionController(
+        maxAutomaticRetries: 0,
         store: store,
         persistence: persistence,
         nextId: () => 'intent_${++ids}',
@@ -42,7 +42,7 @@ void main() {
     await controller.submit('m', 'b1', {
       'selected': ['bj']
     });
-    expect(controller.stateFor('m', 'b1').phase, InteractionPhase.confirming);
+    expect(controller.stateFor('m', 'b1').phase, InteractionPhase.retryable);
     await controller.retry('m', 'b1');
     expect(transport.requests.length, 2);
     expect(transport.requests.first.json, transport.requests.last.json);
@@ -79,6 +79,7 @@ void main() {
       }
     ]);
     final controller = InteractionController(
+        maxAutomaticRetries: 0,
         store: store,
         persistence: persistence,
         transport: transport,
@@ -135,6 +136,7 @@ void main() {
     ]);
     var ids = 0;
     final original = InteractionController(
+        maxAutomaticRetries: 0,
         store: store,
         persistence: persistence,
         transport: transport,
@@ -146,12 +148,12 @@ void main() {
     payload['selected'] = ['sh'];
     await original.dispose();
     final restored = InteractionController(
+        maxAutomaticRetries: 0,
         store: store,
         persistence: persistence,
         transport: transport,
         nextId: () => 'intent_${++ids}');
     await restored.restore('m');
-    await restored.retry('m', 'b1');
     expect(ids, 1);
     expect(transport.requests.map((r) => r.id).toSet(), {'intent_1'});
     expect(transport.requests.last['payload'], {
@@ -162,6 +164,7 @@ void main() {
   test('readonly_never_emits_action_or_message', () async {
     final store = BlockStore()..apply(SyncMessage(seed()));
     final controller = InteractionController(
+        maxAutomaticRetries: 0,
         store: store,
         persistence: MemoryStore(),
         nextId: () => throw StateError('must not allocate'));
@@ -199,6 +202,7 @@ void main() {
     var ids = 0;
     var refreshes = 0;
     final controller = InteractionController(
+        maxAutomaticRetries: 0,
         store: store,
         persistence: persistence,
         transport: transport,
@@ -212,7 +216,7 @@ void main() {
     await controller.submit('m', 'b1', {
       'selected': ['bj']
     });
-    expect(controller.stateFor('m', 'b1').phase, InteractionPhase.confirming);
+    expect(controller.stateFor('m', 'b1').phase, InteractionPhase.retryable);
     await controller.submit('m', 'b1', {
       'selected': ['sh']
     });
@@ -240,6 +244,7 @@ void main() {
         connections: [],
         actions: [(_) async => const ActionSubmission.queued()]);
     final controller = InteractionController(
+        maxAutomaticRetries: 0,
         store: store,
         persistence: persistence,
         transport: transport,
@@ -263,6 +268,7 @@ void main() {
           }))
     ]);
     final controller = InteractionController(
+        maxAutomaticRetries: 0,
         store: store,
         persistence: MemoryStore(),
         transport: transport,
@@ -294,6 +300,7 @@ void main() {
       (_) async => const ActionSubmission.queued(),
     ]);
     final controller = InteractionController(
+        maxAutomaticRetries: 0,
         store: store,
         persistence: MemoryStore(),
         transport: transport,
@@ -335,6 +342,7 @@ void main() {
           })),
     ]);
     final controller = InteractionController(
+        maxAutomaticRetries: 0,
         store: store,
         persistence: MemoryStore(),
         transport: transport,

@@ -41,6 +41,7 @@ class FoldState {
     } else {
       limits.checkBytes(checkpoint.json, limits.maxMessageBytes);
     }
+    if (!strictBlocks) checkConsumerBlocks(checkpoint, limits: limits);
     _message = {...checkpoint.json}..remove('lastSeq');
     lastSeq = seq;
     _answer = null;
@@ -53,7 +54,7 @@ class FoldState {
     final e = event.json;
     final type = event.type;
     if (type == 'message.activity') {
-      limits.checkEvent(e);
+      limits.checkEvent(e, checkBlockData: strictBlocks);
       if (e.containsKey('seq')) _fail('invalid_event');
       return false;
     }
@@ -63,7 +64,7 @@ class FoldState {
       if (seq < lastSeq) return false;
       final checkpoint = Message.fromJson(object(e['message']));
       if (checkpoint.id != event.messageId) _fail('message_mismatch');
-      limits.checkEvent(e);
+      limits.checkEvent(e, checkBlockData: strictBlocks);
       restore(checkpoint, seq);
       if (legacySteps) _message = {..._message!}..remove('steps');
       return true;
@@ -71,7 +72,7 @@ class FoldState {
     if (seq <= lastSeq) return false;
     if (seq != lastSeq + 1) _fail('seq_gap');
     if (seq > limits.maxEvents) _fail('limit_exceeded');
-    limits.checkEvent(e);
+    limits.checkEvent(e, checkBlockData: strictBlocks);
     final m = <String, Object?>{...?_message};
     final ids = {..._interruptIds};
     (int, String)? answer;
@@ -335,6 +336,7 @@ class FoldState {
       limits.checkBytes(m, limits.maxMessageBytes);
     }
     _message = object(freeze(m));
+    if (!strictBlocks) checkConsumerBlocks(message, limits: limits);
     _interruptIds = ids;
     _answer = answer;
     lastSeq = seq;
