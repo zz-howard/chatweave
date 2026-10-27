@@ -56,11 +56,7 @@ impl ActionHandler<String> for Handler {
         }
     }
 
-    async fn execute(
-        &self,
-        _: &String,
-        _: ResolvedAction,
-    ) -> Result<ActionOutcome, ActionError> {
+    async fn execute(&self, _: &String, _: ResolvedAction) -> Result<ActionOutcome, ActionError> {
         self.calls.trace.lock().unwrap().push("execute");
         self.calls.execute.fetch_add(1, Ordering::SeqCst);
         Ok(ActionOutcome::default())
@@ -124,15 +120,27 @@ fn without_error_prose(mut value: Value) -> Value {
 #[tokio::test]
 async fn every_ordered_action_fixture_is_executed_and_checked() {
     let fixtures = scenarios();
-    assert_eq!(fixtures.len(), 28, "the full promised scenario inventory must run");
+    assert_eq!(
+        fixtures.len(),
+        28,
+        "the full promised scenario inventory must run"
+    );
     let mut exercised = BTreeSet::new();
     let validator = Validator::default();
     for scenario in fixtures {
         let name = scenario["name"].as_str().unwrap();
-        assert!(exercised.insert(name.to_owned()), "duplicate scenario: {name}");
+        assert!(
+            exercised.insert(name.to_owned()),
+            "duplicate scenario: {name}"
+        );
         let decisions = scenario["authorizeDecisions"]
             .as_array()
-            .map(|values| values.iter().map(|value| value.as_bool().unwrap()).collect())
+            .map(|values| {
+                values
+                    .iter()
+                    .map(|value| value.as_bool().unwrap())
+                    .collect()
+            })
             .unwrap_or_default();
         let calls = Arc::new(Calls {
             decisions,
@@ -162,12 +170,16 @@ async fn every_ordered_action_fixture_is_executed_and_checked() {
         assert!(!requests.is_empty(), "empty scenario: {name}");
         assert_eq!(requests.len(), results.len(), "scenario: {name}");
         for (request, expected) in requests.iter().zip(results) {
-            validator.validate(DocumentKind::ActionRequest, request).unwrap();
+            validator
+                .validate(DocumentKind::ActionRequest, request)
+                .unwrap();
             let actual = registry
                 .dispatch(&ctx, ActionRequest(request.clone()), &store)
                 .await
                 .unwrap_or_else(|error| panic!("{name}: {error}"));
-            validator.validate(DocumentKind::ActionResult, &actual.0).unwrap();
+            validator
+                .validate(DocumentKind::ActionResult, &actual.0)
+                .unwrap();
             assert_eq!(
                 without_error_prose(actual.0),
                 without_error_prose(expected.clone()),
@@ -181,9 +193,17 @@ async fn every_ordered_action_fixture_is_executed_and_checked() {
             assert_eq!(name, "normal-answer");
             1
         });
-        assert_eq!(calls.execute.load(Ordering::SeqCst) as u64, expected_execute, "scenario: {name}");
+        assert_eq!(
+            calls.execute.load(Ordering::SeqCst) as u64,
+            expected_execute,
+            "scenario: {name}"
+        );
         if let Some(decisions) = scenario["authorizeDecisions"].as_array() {
-            assert_eq!(calls.authorize.load(Ordering::SeqCst), decisions.len(), "scenario: {name}");
+            assert_eq!(
+                calls.authorize.load(Ordering::SeqCst),
+                decisions.len(),
+                "scenario: {name}"
+            );
         }
     }
     assert_eq!(exercised.len(), 28);
@@ -197,17 +217,29 @@ async fn revoked_permission_is_checked_before_a_successful_receipt_is_replayed()
     });
     let registry = registry(calls.clone());
     let store = store();
-    store.insert_message(SCOPE, Message(normal_seed())).await.unwrap();
+    store
+        .insert_message(SCOPE, Message(normal_seed()))
+        .await
+        .unwrap();
     let request = ActionRequest(normal_request());
-    let first = registry.dispatch(&SCOPE.to_owned(), request.clone(), &store).await.unwrap();
+    let first = registry
+        .dispatch(&SCOPE.to_owned(), request.clone(), &store)
+        .await
+        .unwrap();
     assert_eq!(first.0["status"], "completed");
-    let second = registry.dispatch(&SCOPE.to_owned(), request, &store).await.unwrap();
+    let second = registry
+        .dispatch(&SCOPE.to_owned(), request, &store)
+        .await
+        .unwrap();
     assert_eq!(second.0["status"], "rejected");
     assert_eq!(second.0["error"]["code"], "forbidden");
     assert_ne!(second.0["replayed"], true);
     assert_eq!(calls.authorize.load(Ordering::SeqCst), 2);
     assert_eq!(calls.execute.load(Ordering::SeqCst), 1);
-    assert_eq!(*calls.trace.lock().unwrap(), ["authorize", "execute", "authorize"]);
+    assert_eq!(
+        *calls.trace.lock().unwrap(),
+        ["authorize", "execute", "authorize"]
+    );
     // Negative control: moving receipt replay above authorize makes the second
     // request succeed and removes the final trace entry, so this test fails.
 }
@@ -220,12 +252,21 @@ async fn an_open_but_expired_block_is_closed_before_execution_and_returns_curren
     let mut seed = normal_seed();
     seed["blocks"][0]["data"]["action"]["expiresAt"] = json!("2000-01-01T00:00:00Z");
     store.insert_message(SCOPE, Message(seed)).await.unwrap();
-    let result = registry.dispatch(&SCOPE.to_owned(), ActionRequest(normal_request()), &store).await.unwrap();
+    let result = registry
+        .dispatch(&SCOPE.to_owned(), ActionRequest(normal_request()), &store)
+        .await
+        .unwrap();
     assert_eq!(result.0["status"], "rejected");
     assert_eq!(result.0["error"]["code"], "expired");
     assert_eq!(result.0["patches"][0]["rev"], 2);
-    assert_eq!(result.0["patches"][0]["patch"]["data"]["state"]["status"], "expired");
-    assert_eq!(store.load_message(SCOPE, "msg_weather").await.unwrap().0["rev"], 2);
+    assert_eq!(
+        result.0["patches"][0]["patch"]["data"]["state"]["status"],
+        "expired"
+    );
+    assert_eq!(
+        store.load_message(SCOPE, "msg_weather").await.unwrap().0["rev"],
+        2
+    );
     assert_eq!(calls.authorize.load(Ordering::SeqCst), 0);
     assert_eq!(calls.execute.load(Ordering::SeqCst), 0);
 }
@@ -235,10 +276,23 @@ async fn scope_checks_hide_both_the_block_and_its_saved_receipt() {
     let calls = Arc::new(Calls::default());
     let registry = registry(calls.clone());
     let store = store();
-    store.insert_message(SCOPE, Message(normal_seed())).await.unwrap();
+    store
+        .insert_message(SCOPE, Message(normal_seed()))
+        .await
+        .unwrap();
     let request = ActionRequest(normal_request());
-    assert_eq!(registry.dispatch(&SCOPE.to_owned(), request.clone(), &store).await.unwrap().0["status"], "completed");
-    let hidden = registry.dispatch(&"scope_other".to_owned(), request, &store).await.unwrap();
+    assert_eq!(
+        registry
+            .dispatch(&SCOPE.to_owned(), request.clone(), &store)
+            .await
+            .unwrap()
+            .0["status"],
+        "completed"
+    );
+    let hidden = registry
+        .dispatch(&"scope_other".to_owned(), request, &store)
+        .await
+        .unwrap();
     assert_eq!(hidden.0["status"], "rejected");
     assert_eq!(hidden.0["error"]["code"], "not_found");
     assert!(hidden.0.get("patches").is_none());
@@ -251,15 +305,27 @@ async fn canonical_binding_ignores_client_timestamp_but_rejects_changed_payload(
     let calls = Arc::new(Calls::default());
     let registry = registry(calls.clone());
     let store = store();
-    store.insert_message(SCOPE, Message(normal_seed())).await.unwrap();
+    store
+        .insert_message(SCOPE, Message(normal_seed()))
+        .await
+        .unwrap();
     let mut request = normal_request();
     request["clientTs"] = json!("2026-10-26T09:30:01Z");
-    registry.dispatch(&SCOPE.to_owned(), ActionRequest(request.clone()), &store).await.unwrap();
+    registry
+        .dispatch(&SCOPE.to_owned(), ActionRequest(request.clone()), &store)
+        .await
+        .unwrap();
     request["clientTs"] = json!("2026-10-26T09:30:02Z");
-    let repeated = registry.dispatch(&SCOPE.to_owned(), ActionRequest(request.clone()), &store).await.unwrap();
+    let repeated = registry
+        .dispatch(&SCOPE.to_owned(), ActionRequest(request.clone()), &store)
+        .await
+        .unwrap();
     assert_eq!(repeated.0["replayed"], true);
     request["payload"] = json!({"selected":["sh"]});
-    let changed = registry.dispatch(&SCOPE.to_owned(), ActionRequest(request), &store).await.unwrap();
+    let changed = registry
+        .dispatch(&SCOPE.to_owned(), ActionRequest(request), &store)
+        .await
+        .unwrap();
     assert_eq!(changed.0["error"]["code"], "invalid_request");
     assert_ne!(changed.0["replayed"], true);
     assert_eq!(calls.execute.load(Ordering::SeqCst), 1);

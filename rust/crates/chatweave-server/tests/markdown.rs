@@ -8,8 +8,10 @@ use std::sync::Arc;
 
 #[test]
 fn plain_text_removes_formatting_but_preserves_code_html_and_line_breaks() {
-    assert_eq!(plain_text("Today is **sunny** and `18°C`.\nTake a walk."),
-        "Today is sunny and 18°C.\nTake a walk.");
+    assert_eq!(
+        plain_text("Today is **sunny** and `18°C`.\nTake a walk."),
+        "Today is sunny and 18°C.\nTake a walk."
+    );
     assert!(plain_text("<b>Weather</b>").contains("<b>Weather</b>"));
     assert_eq!(plain_text("**unfinished"), "**unfinished");
 }
@@ -25,7 +27,10 @@ fn fallback_uses_content_blocks_and_never_process_steps() {
         ],
         "steps":[{"label":"PRIVATE STEP LABEL","summary":"PRIVATE STEP SUMMARY"}]
     }));
-    assert_eq!(fallback_text(&message), "Sunny\n\nHigh: 18°C\n\nText unavailable\n\nBuy tea");
+    assert_eq!(
+        fallback_text(&message),
+        "Sunny\n\nHigh: 18°C\n\nText unavailable\n\nBuy tea"
+    );
 }
 
 #[tokio::test]
@@ -37,21 +42,34 @@ async fn adapter_preserves_prose_and_never_extracts_structured_facts() {
         log.clone(),
         Arc::new(BroadcastHub::default()),
         Arc::new(MemoryCheckpointStore::default()),
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
     let mut adapter = MarkdownAdapter::new(stream);
     adapter.push_text("Forecast: **18°C**. ").await.unwrap();
-    adapter.push_text("There are three tasks.\n```json\n{\"value\":18}\n```")
-        .await.unwrap();
+    adapter
+        .push_text("There are three tasks.\n```json\n{\"value\":18}\n```")
+        .await
+        .unwrap();
     let message = adapter.finish().await.unwrap();
     let blocks = message.0["blocks"].as_array().unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0]["type"], "markdown");
     assert_eq!(blocks[0]["metadata"]["provenance"], "adapter");
-    assert_eq!(blocks[0]["data"]["text"],
-        "Forecast: **18°C**. There are three tasks.\n```json\n{\"value\":18}\n```");
-    assert!(message.0["fallbackText"].as_str().unwrap().contains("{\"value\":18}"));
+    assert_eq!(
+        blocks[0]["data"]["text"],
+        "Forecast: **18°C**. There are three tasks.\n```json\n{\"value\":18}\n```"
+    );
+    assert!(
+        message.0["fallbackText"]
+            .as_str()
+            .unwrap()
+            .contains("{\"value\":18}")
+    );
     let validator = Validator::default();
-    validator.validate(DocumentKind::Message, &message.0).unwrap();
+    validator
+        .validate(DocumentKind::Message, &message.0)
+        .unwrap();
     for event in log.read_after("msg_adapter", 0).await.unwrap().events {
         validator.validate(DocumentKind::Event, &event.0).unwrap();
     }
@@ -65,7 +83,9 @@ async fn empty_adapter_can_finish_without_inventing_a_block() {
         Arc::new(MemoryEventLog::default()),
         Arc::new(BroadcastHub::default()),
         Arc::new(MemoryCheckpointStore::default()),
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
     let message = MarkdownAdapter::new(stream).finish().await.unwrap();
     assert_eq!(message.0["blocks"], json!([]));
     assert_eq!(message.0["fallbackText"], "");

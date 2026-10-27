@@ -1,7 +1,5 @@
 use chatweave_server::Error;
-use chatweave_server::event_log::{
-    BroadcastHub, EventLog, EventSink, MemoryEventLog, sequence,
-};
+use chatweave_server::event_log::{BroadcastHub, EventLog, EventSink, MemoryEventLog, sequence};
 use chatweave_server::protocol::StreamEvent;
 use serde_json::json;
 use std::time::Duration;
@@ -39,7 +37,10 @@ async fn messages_have_independent_sequences_and_ranges_are_ordered() {
     let batch = log.read_range("msg_weather", 1, 3).await.unwrap();
     assert!(batch.covered);
     assert_eq!(batch.head, 4);
-    assert_eq!(batch.events.iter().map(sequence).collect::<Vec<_>>(), vec![Some(2), Some(3)]);
+    assert_eq!(
+        batch.events.iter().map(sequence).collect::<Vec<_>>(),
+        vec![Some(2), Some(3)]
+    );
     assert_eq!(log.read_after("msg_tasks", 0).await.unwrap().head, 1);
     let missing = log.read_after("msg_absent", 0).await.unwrap();
     assert!(!missing.covered);
@@ -55,7 +56,10 @@ async fn event_capacity_evicts_payloads_and_reports_missing_coverage() {
     let old = log.read_after("msg_ring", 0).await.unwrap();
     assert!(!old.covered);
     assert_eq!(old.head, 3);
-    assert_eq!(old.events.iter().map(sequence).collect::<Vec<_>>(), vec![Some(2), Some(3)]);
+    assert_eq!(
+        old.events.iter().map(sequence).collect::<Vec<_>>(),
+        vec![Some(2), Some(3)]
+    );
     assert!(log.read_after("msg_ring", 1).await.unwrap().covered);
     assert!(!log.read_range("msg_ring", 0, 2).await.unwrap().covered);
     log.clear("msg_ring").await;
@@ -84,9 +88,18 @@ async fn retention_starts_at_pause_and_resumption_opens_a_new_segment() {
     log.append(event("msg_retention", 1)).await.unwrap();
     tokio::time::advance(Duration::from_secs(3_600)).await;
     assert!(log.read_after("msg_retention", 0).await.unwrap().covered);
-    log.append(terminal("msg_retention", 2, true)).await.unwrap();
+    log.append(terminal("msg_retention", 2, true))
+        .await
+        .unwrap();
     tokio::time::advance(Duration::from_secs(599)).await;
-    assert_eq!(log.read_after("msg_retention", 0).await.unwrap().events.len(), 2);
+    assert_eq!(
+        log.read_after("msg_retention", 0)
+            .await
+            .unwrap()
+            .events
+            .len(),
+        2
+    );
     tokio::time::advance(Duration::from_secs(1)).await;
     let expired = log.read_after("msg_retention", 0).await.unwrap();
     assert_eq!(expired.head, 0);
@@ -95,24 +108,47 @@ async fn retention_starts_at_pause_and_resumption_opens_a_new_segment() {
     log.append(StreamEvent(json!({
         "protocolVersion":"0.1", "messageId":"msg_retention", "seq":3,
         "type":"message.resumed", "interruptId":"interrupt_1"
-    }))).await.unwrap();
+    })))
+    .await
+    .unwrap();
     tokio::time::advance(Duration::from_secs(3_600)).await;
     assert!(log.read_after("msg_retention", 2).await.unwrap().covered);
     assert!(!log.read_after("msg_retention", 0).await.unwrap().covered);
-    log.append(terminal("msg_retention", 4, false)).await.unwrap();
+    log.append(terminal("msg_retention", 4, false))
+        .await
+        .unwrap();
     tokio::time::advance(Duration::from_secs(600)).await;
-    assert!(log.read_after("msg_retention", 2).await.unwrap().events.is_empty());
+    assert!(
+        log.read_after("msg_retention", 2)
+            .await
+            .unwrap()
+            .events
+            .is_empty()
+    );
 }
 
 #[tokio::test]
 async fn duplicate_and_gap_appends_do_not_change_the_head() {
     let log = MemoryEventLog::default();
     log.append(event("msg_conflict", 1)).await.unwrap();
-    assert!(matches!(log.append(event("msg_conflict", 1)).await, Err(Error::Conflict)));
-    assert!(matches!(log.append(event("msg_conflict", 3)).await, Err(Error::Conflict)));
+    assert!(matches!(
+        log.append(event("msg_conflict", 1)).await,
+        Err(Error::Conflict)
+    ));
+    assert!(matches!(
+        log.append(event("msg_conflict", 3)).await,
+        Err(Error::Conflict)
+    ));
     assert_eq!(log.read_after("msg_conflict", 0).await.unwrap().head, 1);
     log.append(event("msg_conflict", 2)).await.unwrap();
-    assert_eq!(log.read_after("msg_conflict", 0).await.unwrap().events.len(), 2);
+    assert_eq!(
+        log.read_after("msg_conflict", 0)
+            .await
+            .unwrap()
+            .events
+            .len(),
+        2
+    );
 }
 
 #[tokio::test]

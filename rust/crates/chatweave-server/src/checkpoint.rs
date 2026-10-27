@@ -14,7 +14,11 @@ pub struct Checkpoint {
 }
 impl Checkpoint {
     pub fn new(message: Message, last_seq: u64) -> Self {
-        Self { message, last_seq, step_work_ms: HashMap::new() }
+        Self {
+            message,
+            last_seq,
+            step_work_ms: HashMap::new(),
+        }
     }
 }
 
@@ -35,12 +39,20 @@ impl CheckpointStore for MemoryCheckpointStore {
     }
     async fn commit(&self, checkpoint: Checkpoint, expected_seq: Option<u64>) -> Result<()> {
         let mut messages = self.0.lock().await;
-        let id = checkpoint.message.0["id"].as_str().ok_or_else(|| Error::InvalidRequest("missing message id".into()))?.to_owned();
+        let id = checkpoint.message.0["id"]
+            .as_str()
+            .ok_or_else(|| Error::InvalidRequest("missing message id".into()))?
+            .to_owned();
         if let Some(previous) = messages.get(&id) {
-            if checkpoint.last_seq < previous.last_seq || checkpoint.message.rev() < previous.message.rev() || expected_seq.is_some_and(|seq| seq != previous.last_seq) {
+            if checkpoint.last_seq < previous.last_seq
+                || checkpoint.message.rev() < previous.message.rev()
+                || expected_seq.is_some_and(|seq| seq != previous.last_seq)
+            {
                 return Err(Error::Conflict);
             }
-        } else if expected_seq.is_some() { return Err(Error::Conflict); }
+        } else if expected_seq.is_some() {
+            return Err(Error::Conflict);
+        }
         messages.insert(id, checkpoint);
         Ok(())
     }

@@ -68,7 +68,12 @@ async fn endpoint(
 }
 
 fn test_server(service: ResumeService) -> TestServer {
-    TestServer::new(Router::new().route("/stream", get(endpoint)).with_state(service)).unwrap()
+    TestServer::new(
+        Router::new()
+            .route("/stream", get(endpoint))
+            .with_state(service),
+    )
+    .unwrap()
 }
 
 async fn setup(
@@ -145,7 +150,10 @@ async fn dropped_sse_body_reconnects_with_last_event_id_and_matches_the_full_fol
         .await;
     response.assert_status_ok();
     let resumed = data_events(&response.text());
-    assert_eq!(resumed.iter().map(StreamEvent::seq).collect::<Vec<_>>(), vec![Some(4), Some(5)]);
+    assert_eq!(
+        resumed.iter().map(StreamEvent::seq).collect::<Vec<_>>(),
+        vec![Some(4), Some(5)]
+    );
     let mut combined = data_events(&received);
     combined.extend(resumed);
     assert_eq!(fold(combined).unwrap(), expected_message());
@@ -156,16 +164,31 @@ async fn http_response_has_protocol_cache_and_proxy_headers_and_ordered_sse_ids(
     let (service, _, _, _) = setup(5, true).await;
     let response = test_server(service).get("/stream").await;
     response.assert_status_ok();
-    response.assert_header(header::CONTENT_TYPE, HeaderValue::from_static("text/event-stream"));
+    response.assert_header(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/event-stream"),
+    );
     response.assert_header(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    response.assert_header(HeaderName::from_static("chatweave-protocol"), HeaderValue::from_static("0.1"));
-    response.assert_header(HeaderName::from_static("x-accel-buffering"), HeaderValue::from_static("no"));
+    response.assert_header(
+        HeaderName::from_static("chatweave-protocol"),
+        HeaderValue::from_static("0.1"),
+    );
+    response.assert_header(
+        HeaderName::from_static("x-accel-buffering"),
+        HeaderValue::from_static("no"),
+    );
     let text = response.text();
     assert!(text.contains("retry: 2000"));
-    let ids: Vec<_> = text.lines().filter_map(|line| line.strip_prefix("id:"))
-        .map(|id| id.trim().parse::<u64>().unwrap()).collect();
+    let ids: Vec<_> = text
+        .lines()
+        .filter_map(|line| line.strip_prefix("id:"))
+        .map(|id| id.trim().parse::<u64>().unwrap())
+        .collect();
     assert_eq!(ids, vec![1, 2, 3, 4, 5]);
-    assert_eq!(data_events(&text).last().unwrap().event_type(), "message.end");
+    assert_eq!(
+        data_events(&text).last().unwrap().event_type(),
+        "message.end"
+    );
 }
 
 #[tokio::test]
@@ -202,19 +225,31 @@ async fn missing_replay_without_snapshot_capability_sends_error_and_closes() {
 async fn header_cursor_takes_priority_and_bad_or_future_cursors_are_rejected() {
     let (service, _, _, _) = setup(5, true).await;
     let server = test_server(service);
-    let response = server.get("/stream")
+    let response = server
+        .get("/stream")
         .add_query_param("after", "999")
-        .add_header(HeaderName::from_static("last-event-id"), HeaderValue::from_static("3"))
+        .add_header(
+            HeaderName::from_static("last-event-id"),
+            HeaderValue::from_static("3"),
+        )
         .await;
     response.assert_status_ok();
     assert_eq!(data_events(&response.text())[0].seq(), Some(4));
-    let bad_header = server.get("/stream")
+    let bad_header = server
+        .get("/stream")
         .add_query_param("after", "3")
-        .add_header(HeaderName::from_static("last-event-id"), HeaderValue::from_static("bad"))
+        .add_header(
+            HeaderName::from_static("last-event-id"),
+            HeaderValue::from_static("bad"),
+        )
         .expect_failure()
         .await;
     bad_header.assert_status(StatusCode::BAD_REQUEST);
-    let future = server.get("/stream").add_query_param("after", "6").expect_failure().await;
+    let future = server
+        .get("/stream")
+        .add_query_param("after", "6")
+        .expect_failure()
+        .await;
     future.assert_status(StatusCode::BAD_REQUEST);
 }
 
@@ -223,28 +258,46 @@ async fn live_activity_frames_have_no_id_and_are_filtered_by_capability() {
     for enabled in [false, true] {
         let (service, log, hub, _) = setup(3, false).await;
         let response = sse_response(
-            &service, "msg_weather", &HeaderMap::new(), None,
-            ResumeOptions { activity: enabled, ..ResumeOptions::default() },
-        ).await.unwrap();
+            &service,
+            "msg_weather",
+            &HeaderMap::new(),
+            None,
+            ResumeOptions {
+                activity: enabled,
+                ..ResumeOptions::default()
+            },
+        )
+        .await
+        .unwrap();
         hub.publish(StreamEvent(json!({
             "protocolVersion":"0.1","messageId":"msg_weather","type":"message.activity",
             "activity":{"phase":"working","label":"Checking weather"}
-        }))).await.unwrap();
+        })))
+        .await
+        .unwrap();
         for event in &fixture_events()[3..] {
             log.append(event.clone()).await.unwrap();
             hub.publish(event.clone()).await.unwrap();
         }
         let bytes = tokio::time::timeout(Duration::from_secs(2), response.into_body().collect())
-            .await.unwrap().unwrap().to_bytes();
+            .await
+            .unwrap()
+            .unwrap()
+            .to_bytes();
         let text = std::str::from_utf8(&bytes).unwrap();
         let normalized = text.replace("\r\n", "\n");
-        let activity_frames: Vec<_> = normalized.split("\n\n")
-            .filter(|frame| frame.contains("event: message.activity")).collect();
+        let activity_frames: Vec<_> = normalized
+            .split("\n\n")
+            .filter(|frame| frame.contains("event: message.activity"))
+            .collect();
         assert_eq!(activity_frames.len(), usize::from(enabled));
         for frame in activity_frames {
             assert!(!frame.lines().any(|line| line.starts_with("id:")));
         }
-        assert_eq!(log.read_after("msg_weather", 0).await.unwrap().events.len(), 5);
+        assert_eq!(
+            log.read_after("msg_weather", 0).await.unwrap().events.len(),
+            5
+        );
         assert_eq!(fold(data_events(text)).unwrap(), expected_message());
     }
 }
@@ -253,13 +306,21 @@ async fn live_activity_frames_have_no_id_and_are_filtered_by_capability() {
 async fn heartbeat_is_a_comment_and_does_not_advance_the_event_cursor() {
     let (service, log, hub, _) = setup(3, false).await;
     let response = sse_response(
-        &service, "msg_weather", &HeaderMap::new(), None, ResumeOptions::default(),
-    ).await.unwrap();
+        &service,
+        "msg_weather",
+        &HeaderMap::new(),
+        None,
+        ResumeOptions::default(),
+    )
+    .await
+    .unwrap();
     let mut body = response.into_body();
     let mut wire = String::new();
     while data_events(&wire).last().and_then(StreamEvent::seq) != Some(3) {
         let frame = body.frame().await.unwrap().unwrap();
-        if let Some(bytes) = frame.data_ref() { wire.push_str(std::str::from_utf8(bytes).unwrap()); }
+        if let Some(bytes) = frame.data_ref() {
+            wire.push_str(std::str::from_utf8(bytes).unwrap());
+        }
     }
     tokio::time::advance(Duration::from_secs(15)).await;
     let frame = body.frame().await.unwrap().unwrap();
