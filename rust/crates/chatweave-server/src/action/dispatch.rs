@@ -93,6 +93,16 @@ pub(super) async fn dispatch<Ctx: Send + Sync + 'static>(
         if stored.state() != "open" {
             return Ok(state_rejection(request, &stored));
         }
+        // Only the interrupt block of a paused message can be answered before
+        // the message ends. Refuse other blocks here, before authorize and
+        // execute: refusing at commit would leave an executed side effect
+        // behind a `conflict`, and a retry would execute it again.
+        if stored.unfinished() && !stored.is_interrupt() {
+            return Err(ActionError::new(
+                "conflict",
+                "unfinished non-interrupt block",
+            ));
+        }
         if r["context"]
             .get("conversationId")
             .is_some_and(|id| *id != stored.message.0["conversationId"])
