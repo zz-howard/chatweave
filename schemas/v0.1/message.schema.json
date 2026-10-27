@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/zz-howard/chatweave/schemas/v0.1/message.schema.json",
-  "title": "ChatWeave Message (draft 0.1)",
-  "description": "DRAFT. A chat message as persisted by the host and synced to clients: an ordered list of content blocks plus a mandatory plain-text fallback. After reconnect or offline, the persisted message (higher rev) always wins over a locally assembled stream state.",
+  "title": "ChatWeave Message (0.1)",
+  "description": "A chat message as persisted by the host and synced to clients: an ordered list of content blocks plus a mandatory plain-text fallback. After reconnect or offline, the persisted message (higher rev) always wins over a locally assembled stream state.",
   "type": "object",
   "required": ["id", "protocolVersion", "role", "status", "blocks", "fallbackText", "rev", "createdAt"],
   "additionalProperties": false,
@@ -72,6 +72,17 @@
           "steps": {
             "$comment": "Once the message has ended, every step has ended too: the producer emits step.finished for each started step before message.end.",
             "items": { "properties": { "state": { "enum": ["succeeded", "failed", "cancelled"] } } }
+          },
+          "blocks": {
+            "items": {
+              "properties": {
+                "status": {
+                  "not": {
+                    "const": "pending"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -82,7 +93,18 @@
       "then": {
         "required": ["interrupt", "lastSeq", "steps"],
         "properties": {
-          "steps": { "contains": { "properties": { "state": { "const": "awaiting_user" } }, "required": ["state"] }, "minContains": 1, "maxContains": 1 }
+          "steps": { "contains": { "properties": { "state": { "const": "awaiting_user" } }, "required": ["state"] }, "minContains": 1, "maxContains": 1 },
+          "blocks": {
+            "items": {
+              "properties": {
+                "status": {
+                  "not": {
+                    "const": "pending"
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "else": {

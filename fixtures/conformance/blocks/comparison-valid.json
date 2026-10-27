@@ -1,0 +1,37 @@
+{
+  "id": "b1",
+  "type": "comparison",
+  "schemaVersion": 1,
+  "data": {
+    "subjects": [
+      {
+        "id": "bj",
+        "label": "北京"
+      },
+      {
+        "id": "sh",
+        "label": "上海"
+      }
+    ],
+    "attributes": [
+      {
+        "key": "high",
+        "label": "最高温",
+        "type": "number"
+      }
+    ],
+    "values": [
+      {
+        "subject": "bj",
+        "attribute": "high",
+        "value": 18
+      },
+      {
+        "subject": "sh",
+        "attribute": "high",
+        "value": 20
+      }
+    ]
+  },
+  "fallbackText": "北京18°C，上海20°C"
+}

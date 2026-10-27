@@ -1,0 +1,35 @@
+{
+  "id": "msg_weather",
+  "protocolVersion": "0.1",
+  "conversationId": "conv_weather",
+  "role": "assistant",
+  "status": "complete",
+  "rev": 1,
+  "createdAt": "2026-10-26T09:30:00Z",
+  "fallbackText": "天气晴朗。",
+  "blocks": [
+    {
+      "id": "b1",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "label": "查天气",
+      "state": "failed",
+      "durationMs": 100,
+      "summary": "天气暂不可用"
+    },
+    {
+      "id": "s2",
+      "label": "读待办",
+      "state": "succeeded",
+      "durationMs": 100
+    }
+  ]
+}

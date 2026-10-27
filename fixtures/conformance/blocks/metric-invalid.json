@@ -1,0 +1,11 @@
+{
+  "id": "b2",
+  "type": "metric",
+  "schemaVersion": 1,
+  "data": {
+    "label": "最高气温",
+    "value": true,
+    "unit": "°C"
+  },
+  "fallbackText": "最高气温18°C"
+}

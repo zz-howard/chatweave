@@ -1,0 +1,10 @@
+{
+  "id": "b1",
+  "type": "metric_group",
+  "schemaVersion": 1,
+  "data": {
+    "title": "今日天气",
+    "metrics": []
+  },
+  "fallbackText": "最高18°C"
+}

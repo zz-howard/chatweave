@@ -1,0 +1,27 @@
+{
+  "protocolVersions": [
+    "0.1"
+  ],
+  "blocks": {
+    "markdown": 1,
+    "metric": 1,
+    "metric_group": 1,
+    "dataset": 1,
+    "time_series": 1,
+    "comparison": 1,
+    "status": 1,
+    "choice": 1,
+    "confirmation": 1,
+    "form_intent": 1
+  },
+  "features": [
+    "stream.resume",
+    "stream.snapshot",
+    "stream.activity",
+    "stream.steps",
+    "action.choice",
+    "action.confirmation",
+    "action.form"
+  ],
+  "locale": "zh-CN"
+}

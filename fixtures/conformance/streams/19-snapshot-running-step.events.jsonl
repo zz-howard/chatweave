@@ -1,0 +1,6 @@
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"message.snapshot","message":{"id":"msg_weather","protocolVersion":"0.1","conversationId":"conv_weather","role":"assistant","status":"streaming","rev":0,"createdAt":"2026-10-26T09:30:00Z","fallbackText":"","blocks":[],"lastSeq":2,"steps":[{"id":"s1","label":"查天气","state":"running"}]},"seq":2}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"step.finished","stepId":"s1","state":"succeeded","durationMs":100,"seq":3}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.start","blockId":"b1","index":0,"blockType":"markdown","schemaVersion":1,"seq":4}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.delta","blockId":"b1","delta":{"text":"天气晴朗。"},"seq":5}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.end","blockId":"b1","status":"complete","seq":6}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"message.end","status":"complete","fallbackText":"天气晴朗。","blockCount":1,"rev":1,"seq":7}

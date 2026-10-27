@@ -1,0 +1,10 @@
+{
+  "actionId": "action_0001",
+  "status": "accepted",
+  "resume": {
+    "messageId": "msg_weather"
+  },
+  "followUp": {
+    "messageId": "msg_next"
+  }
+}

@@ -1,0 +1,11 @@
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"message.start","message":{"id":"msg_weather","role":"assistant","conversationId":"conv_weather","createdAt":"2026-10-26T09:30:00Z"},"seq":1}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"step.started","stepId":"s1","label":"删除待办","seq":2}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.start","blockId":"b1","index":0,"blockType":"confirmation","schemaVersion":1,"seq":3}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.data","blockId":"b1","data":{"title":"删除待办？","severity":"destructive","action":{"type":"confirmation.respond","target":"todo.delete","requiresConfirmation":true,"expiresAt":"2026-10-27T09:30:00Z"},"state":{"status":"open"}},"fallbackText":"删除待办？","seq":4}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.end","blockId":"b1","status":"complete","seq":5}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"message.paused","interrupt":{"id":"int_1","stepId":"s1","blockId":"b1","reason":"confirmation"},"fallbackText":"删除待办？","blockCount":1,"seq":6}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"block.patch","blockId":"b1","patch":{"data":{"state":{"status":"resolved","outcome":"confirm","resolvedAt":"2026-10-26T09:31:00Z"}}},"seq":7}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"message.resumed","interruptId":"int_1","seq":8}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"step.finished","stepId":"s1","state":"succeeded","durationMs":100,"seq":9}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"step.finished","stepId":"s1","state":"succeeded","durationMs":100,"seq":9}
+{"protocolVersion":"0.1","messageId":"msg_weather","type":"message.end","status":"complete","fallbackText":"删除待办？","blockCount":1,"rev":1,"seq":10}

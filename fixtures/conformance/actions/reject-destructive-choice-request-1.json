@@ -1,0 +1,16 @@
+{
+  "id": "action_0001",
+  "protocolVersion": "0.1",
+  "type": "choice.select",
+  "target": "todo.delete",
+  "context": {
+    "conversationId": "conv_weather",
+    "messageId": "msg_weather",
+    "blockId": "b1"
+  },
+  "payload": {
+    "selected": [
+      "bj"
+    ]
+  }
+}

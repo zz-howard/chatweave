@@ -1,0 +1,8 @@
+{
+  "actionId": "action_0001",
+  "status": "accepted",
+  "resume": {
+    "messageId": "msg_weather",
+    "streamable": true
+  }
+}

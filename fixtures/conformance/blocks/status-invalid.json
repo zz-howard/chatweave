@@ -1,0 +1,14 @@
+{
+  "id": "b1",
+  "type": "status",
+  "schemaVersion": 1,
+  "data": {
+    "label": "同步待办",
+    "state": "done",
+    "progress": {
+      "current": 1,
+      "total": 2
+    }
+  },
+  "fallbackText": "正在同步待办"
+}

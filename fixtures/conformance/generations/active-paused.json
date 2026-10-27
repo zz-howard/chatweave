@@ -1,0 +1,11 @@
+{
+  "conversationId": "conv_weather",
+  "messages": [
+    {
+      "messageId": "msg_weather",
+      "lastSeq": 6,
+      "status": "paused",
+      "replyTo": "user_0001"
+    }
+  ]
+}

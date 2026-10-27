@@ -1,0 +1,46 @@
+{
+  "id": "msg_weather",
+  "protocolVersion": "0.1",
+  "conversationId": "conv_weather",
+  "role": "assistant",
+  "status": "paused",
+  "rev": 0,
+  "createdAt": "2026-10-26T09:30:00Z",
+  "fallbackText": "删除待办？",
+  "blocks": [
+    {
+      "id": "b1",
+      "type": "confirmation",
+      "schemaVersion": 1,
+      "data": {
+        "title": "删除待办？",
+        "severity": "destructive",
+        "action": {
+          "type": "confirmation.respond",
+          "target": "todo.delete",
+          "requiresConfirmation": true,
+          "expiresAt": "2026-10-27T09:30:00Z"
+        },
+        "state": {
+          "status": "open"
+        }
+      },
+      "fallbackText": "删除待办？"
+    }
+  ],
+  "lastSeq": 6,
+  "interrupt": {
+    "id": "int_1",
+    "stepId": "s1",
+    "blockId": "b1",
+    "reason": "confirmation"
+  },
+  "steps": [
+    {
+      "id": "s1",
+      "label": "删除待办",
+      "state": "awaiting_user",
+      "blockId": "b1"
+    }
+  ]
+}

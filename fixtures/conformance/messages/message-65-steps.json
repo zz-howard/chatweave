@@ -1,0 +1,412 @@
+{
+  "id": "msg_weather",
+  "protocolVersion": "0.1",
+  "conversationId": "conv_weather",
+  "role": "assistant",
+  "status": "complete",
+  "rev": 1,
+  "createdAt": "2026-10-26T09:30:00Z",
+  "fallbackText": "天气晴朗。",
+  "blocks": [
+    {
+      "id": "b1",
+      "type": "markdown",
+      "schemaVersion": 1,
+      "data": {
+        "text": "天气晴朗。"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s0",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s1",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s2",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s3",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s4",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s5",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s6",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s7",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s8",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s9",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s10",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s11",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s12",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s13",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s14",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s15",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s16",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s17",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s18",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s19",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s20",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s21",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s22",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s23",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s24",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s25",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s26",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s27",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s28",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s29",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s30",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s31",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s32",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s33",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s34",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s35",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s36",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s37",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s38",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s39",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s40",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s41",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s42",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s43",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s44",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s45",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s46",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s47",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s48",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s49",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s50",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s51",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s52",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s53",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s54",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s55",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s56",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s57",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s58",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s59",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s60",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s61",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s62",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s63",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    },
+    {
+      "id": "s64",
+      "label": "查天气",
+      "state": "succeeded",
+      "durationMs": 1
+    }
+  ]
+}

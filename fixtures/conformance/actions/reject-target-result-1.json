@@ -1,0 +1,8 @@
+{
+  "actionId": "action_0001",
+  "status": "rejected",
+  "error": {
+    "code": "target_mismatch",
+    "message": "请求被拒绝"
+  }
+}

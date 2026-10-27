@@ -1,0 +1,17 @@
+{
+  "id": "b1",
+  "type": "form_intent",
+  "schemaVersion": 1,
+  "data": {
+    "title": "新建待办",
+    "fields": [],
+    "action": {
+      "type": "form.submit",
+      "target": "todo.create"
+    },
+    "state": {
+      "status": "open"
+    }
+  },
+  "fallbackText": "填写事项和优先级"
+}

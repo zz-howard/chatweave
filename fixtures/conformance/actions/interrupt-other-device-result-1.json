@@ -1,0 +1,11 @@
+{
+  "actionId": "action_0001",
+  "status": "rejected",
+  "error": {
+    "code": "already_resolved",
+    "message": "另一台设备已经回答"
+  },
+  "resume": {
+    "messageId": "msg_weather"
+  }
+}

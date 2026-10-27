@@ -1,0 +1,109 @@
+{
+  "id": "b1",
+  "type": "form_intent",
+  "schemaVersion": 1,
+  "data": {
+    "title": "新建待办",
+    "fields": [
+      {
+        "key": "title",
+        "label": "事项",
+        "type": "text",
+        "required": true,
+        "maxLength": 100
+      },
+      {
+        "key": "title",
+        "label": "事项",
+        "type": "text",
+        "required": true,
+        "maxLength": 100
+      },
+      {
+        "key": "title",
+        "label": "事项",
+        "type": "text",
+        "required": true,
+        "maxLength": 100
+      },
+      {
+        "key": "title",
+        "label": "事项",
+        "type": "text",
+        "required": true,
+        "maxLength": 100
+      },
+      {
+        "key": "title",
+        "label": "事项",
+        "type": "text",
+        "required": true,
+        "maxLength": 100
+      },
+      {
+        "key": "title",
+        "label": "事项",
+        "type": "text",
+        "required": true,
+        "maxLength": 100
+      },
+      {
+        "key": "title",
+        "label": "事项",
+        "type": "text",
+        "required": true,
+        "maxLength": 100
+      },
+      {
+        "key": "title",
+        "label": "事项",
+        "type": "text",
+        "required": true,
+        "maxLength": 100
+      },
+      {
+        "key": "title",
+        "label": "事项",
+        "type": "text",
+        "required": true,
+        "maxLength": 100
+      },
+      {
+        "key": "title",
+        "label": "事项",
+        "type": "text",
+        "required": true,
+        "maxLength": 100
+      },
+      {
+        "key": "title",
+        "label": "事项",
+        "type": "text",
+        "required": true,
+        "maxLength": 100
+      },
+      {
+        "key": "title",
+        "label": "事项",
+        "type": "text",
+        "required": true,
+        "maxLength": 100
+      },
+      {
+        "key": "title",
+        "label": "事项",
+        "type": "text",
+        "required": true,
+        "maxLength": 100
+      }
+    ],
+    "action": {
+      "type": "form.submit",
+      "target": "todo.create"
+    },
+    "state": {
+      "status": "open"
+    }
+  },
+  "fallbackText": "填写事项和优先级"
+}
