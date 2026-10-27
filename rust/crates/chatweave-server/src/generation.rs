@@ -28,6 +28,7 @@ struct State {
     starts: HashMap<(String, String), (String, Value)>,
     active: HashMap<(String, String), Active>,
     stop_results: HashMap<(String, String), Value>,
+    stop_gates: HashMap<(String, String), Arc<Mutex<()>>>,
 }
 #[derive(Clone)]
 struct Active { conversation: String, reply_to: String, stream: MessageStream }
@@ -79,14 +80,20 @@ impl GenerationRegistry {
 
     pub async fn stop(&self, scope: &str, message_id: &str) -> Result<Value> {
         let key = (scope.to_owned(), message_id.to_owned());
-        // Serialize duplicate requests through completion of the stop itself.
-        let mut state = self.0.lock().await;
-        if let Some(result) = state.stop_results.get(&key) { return Ok(result.clone()); }
-        let active = state.active.get(&key).cloned().ok_or(Error::NotFound)?;
+        // Serialize one message's duplicate stops without holding the registry
+        // lock across producer callbacks or storage awaits.
+        let gate = self.0.lock().await.stop_gates.entry(key.clone()).or_default().clone();
+        let _stop_guard = gate.lock().await;
+        let active = {
+            let state = self.0.lock().await;
+            if let Some(result) = state.stop_results.get(&key) { return Ok(result.clone()); }
+            state.active.get(&key).cloned().ok_or(Error::NotFound)?
+        };
         let message = active.stream.message().await?;
         let stopping = matches!(message.status(), "streaming" | "paused");
         if stopping { active.stream.stop().await?; }
         let result = json!({"messageId":message_id,"status":if stopping {"stopping"} else {"already_ended"}});
+        let mut state = self.0.lock().await;
         state.stop_results.insert(key.clone(), result.clone());
         // Compare before clearing so a replacement registration is retained.
         if state.active.get(&key).is_some_and(|entry| Arc::ptr_eq(&entry.stream.inner, &active.stream.inner)) {
