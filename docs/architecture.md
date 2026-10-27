@@ -229,8 +229,10 @@ sequenceDiagram
   U->>App: 点选项 / 确认 / 提交表单
   App->>App: 生成 ActionRequest（id = 幂等键），块显示“提交中”（不显示“已选择”）
   App->>API: 提交（宿主可先进离线队列，此时显示“已排队”）
-  API->>API: 加载持久化块 → 校验声明与状态 → 按块校验 payload → 破坏性检查 → 幂等
-  API->>H: authorize → execute
+  API->>API: 加载持久化块 → 校验声明与状态 → 按块校验 payload → 破坏性检查
+  API->>H: authorize
+  API->>API: 幂等（已有结果则回放）
+  API->>H: execute
   H-->>API: 结果（可能引发新一轮 Agent）
   API-->>App: ActionResult（patches、followUp）
   App->>App: 应用补丁，显示服务端记录的结果（可能是同一用户在另一台设备上、或群聊里别人先给出的答案）；如有 followUp，订阅新消息的流

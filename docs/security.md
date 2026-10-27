@@ -22,7 +22,7 @@
 | 4 | 不允许绕过设计系统的任意 HTML / CSS | 块里没有样式字段（Schema 的 `additionalProperties: false` 拒收 `color` 之类的字段）；Markdown 中的 HTML 按纯文本显示 |
 | 5 | Markdown 安全渲染 | 解析层面的受限子集（[rendering.md 第 3 节](rendering.md#3-markdown-安全子集)）：不加载图片、不渲染 HTML、链接协议白名单 + 打开前确认 |
 | 6 | 数据引用验证作用域与权限 | v1 没有数据引用；自定义块推荐只放 ID 引用，**由宿主组件从宿主本地已授权的数据中读取**，读不到就显示“不可用”。Phase 2 的 `dataRef` 只能指向同一消息内的块数据，由服务端校验 |
-| 7 | UI 动作 ≠ 工具执行授权 | 动作只能引用服务端持久化的块中声明的 ActionSpec；dispatcher 依次做声明匹配、状态、按块校验 payload、破坏性确认、幂等、宿主 `authorize`，再执行（[protocol.md 5.2](protocol.md#52-服务端处理顺序库的-dispatcher-固定执行)） |
+| 7 | UI 动作 ≠ 工具执行授权 | 动作只能引用服务端持久化的块中声明的 ActionSpec；dispatcher 依次做声明匹配、状态、按块校验 payload、破坏性确认、宿主 `authorize`、幂等（权限检查在幂等回放之前，失去权限的人拿不到旧结果），再执行（[protocol.md 5.2](protocol.md#52-服务端处理顺序库的-dispatcher-固定执行)） |
 | 8 | 控制深度、节点数、数据规模 | 协议限制（[protocol.md 第 9 节](protocol.md#9-限制防止超大或恶意内容)）：块数、单块与整条消息字节数、嵌套深度、节点数、各类型数量上限、事件大小与数量 |
 | 9 | 未知组件安全降级 | 降级链 → `fallbackText` → 中性提示；单块失败不影响整条消息 |
 | 10 | Markdown-only 模式始终可用 | 消息级 `fallbackText` 必填；`BlockRegistry.markdownOnly()` |

@@ -533,13 +533,13 @@ streaming ──message.paused──▶ paused ──(回答) block.patch + mess
 2. 块里必须声明了 ActionSpec，且 `type`、`target` 与请求一致（否则 `target_mismatch`）；块状态必须是 `open`（否则按当前状态返回 `already_resolved` / `superseded`，并附上当前状态的补丁），未过期（否则 `expired`，同样附上补丁）。
 3. **按块自身的声明校验 payload**：选的选项必须在 `options` 里、数量符合 `selection` / `minSelect` / `maxSelect`；表单值必须满足字段的类型、必填、范围、长度、选项。客户端无法提交块里没出现过的值。`freeText` 只在块是一个开着的中断的块、且该中断的 `otherInput` 不为 `false` 时接受（否则 `invalid_payload`），长度 1–500 字符，原样交给宿主，不做语义校验。
 4. 处理器标记为破坏性时，请求必须来自 `severity: destructive` 的确认块，且 `outcome = confirm`（否则 `confirmation_required`）。
-5. 幂等检查：同一个 `id` 已有结果则直接返回（`replayed: true`）。
-6. 调用宿主处理器的 `authorize`（宿主自己的权限检查），再调用 `execute`。
+5. 调用宿主处理器的 `authorize`（宿主自己的权限检查）。无权即拒绝，即使这个 `id` 之前已有结果也不回放——权限可能已经变了（例如请求者已离开会话），回放旧结果会把数据交给已经无权的人。
+6. 幂等检查：同一个 `id` 已有结果则直接返回（`replayed: true`）；否则调用 `execute`。
 7. 写入块的新状态（`rev + 1`），返回结果与补丁。块是暂停中的消息的中断块时不同：不加 `rev`，答案作为这条消息流里的 `block.patch` 发出，把答案交给宿主的 Agent 运行时继续这一轮，返回 `accepted` + `resume`（4.8 第 11 条）。
 
 第 2 步与第 7 步必须在同一个事务（或等价的条件写入）里完成“检查仍为 `open` → 写入结果”，这样并发的两个答案只有一个能成功，另一个拿到 `already_resolved`。
 
-**UI 动作 ≠ 工具授权**：一个块里出现了按钮，只代表“允许用户发起这个请求”，不代表请求一定被执行；执行与否由第 3、4、6 步决定。模型生成的内容永远无法直接获得工具执行权限。
+**UI 动作 ≠ 工具授权**：一个块里出现了按钮，只代表“允许用户发起这个请求”，不代表请求一定被执行；执行与否由第 3、4、5 步决定。模型生成的内容永远无法直接获得工具执行权限。
 
 ### 5.3 没有动作通道时：只读
 
