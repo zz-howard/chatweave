@@ -1882,5 +1882,6 @@
       "schema": "action.schema.json",
       "scenario": "same-id-different-target"
     }
-  ]
+  ],
+  "actionScenarios": "action-scenarios.json"
 }
