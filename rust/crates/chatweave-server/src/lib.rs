@@ -1,6 +1,7 @@
 //! Transport and storage adapters for the host-neutral ChatWeave protocol.
 #![forbid(unsafe_code)]
 
+pub mod action;
 pub mod checkpoint;
 pub mod event_log;
 pub mod generation;
