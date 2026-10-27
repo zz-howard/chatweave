@@ -229,29 +229,50 @@ impl BroadcastHub {
             capacity: capacity.max(1),
         }
     }
-    async fn sender(&self, message_id: &str) -> broadcast::Sender<StreamEvent> {
+
+    /// Drop channels nobody listens to. Subscribe and publish also prune, so
+    /// channels never outlive their last subscriber for long.
+    pub async fn cleanup(&self) {
         self.channels
             .lock()
             .await
-            .entry(message_id.into())
-            .or_insert_with(|| broadcast::channel(self.capacity).0)
-            .clone()
+            .retain(|_, sender| sender.receiver_count() > 0);
+    }
+
+    /// Number of per-message channels currently held.
+    pub async fn channel_count(&self) -> usize {
+        self.channels.lock().await.len()
     }
 }
 
 #[async_trait]
 impl EventSink for BroadcastHub {
     async fn subscribe(&self, message_id: &str) -> Result<Subscription> {
-        Ok(Subscription {
-            receiver: self.sender(message_id).await.subscribe(),
-        })
+        let mut channels = self.channels.lock().await;
+        channels.retain(|_, sender| sender.receiver_count() > 0);
+        // Subscribe while holding the lock so the new channel cannot be
+        // pruned between creation and its first receiver.
+        let receiver = channels
+            .entry(message_id.into())
+            .or_insert_with(|| broadcast::channel(self.capacity).0)
+            .subscribe();
+        Ok(Subscription { receiver })
     }
     async fn publish(&self, event: StreamEvent) -> Result<()> {
         let id = event.0["messageId"]
             .as_str()
             .ok_or_else(|| Error::InvalidRequest("missing messageId".into()))?;
-        // Having no connected subscribers must never cancel the producer.
-        let _ = self.sender(id).await.send(event);
+        let mut channels = self.channels.lock().await;
+        // Having no connected subscribers must never cancel the producer, and
+        // must not allocate a channel either.
+        let Some(sender) = channels.get(id) else {
+            return Ok(());
+        };
+        if sender.receiver_count() == 0 {
+            channels.remove(id);
+            return Ok(());
+        }
+        let _ = sender.send(event);
         Ok(())
     }
 }
