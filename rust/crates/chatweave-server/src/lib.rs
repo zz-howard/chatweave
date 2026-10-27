@@ -13,7 +13,9 @@ pub mod sse;
 pub mod stream;
 
 pub use chatweave_protocol as protocol;
-pub use stream::{BlockHandle, DelegateStepHandle, MessageStream, StepHandle, StreamConfig};
+pub use stream::{
+    BlockHandle, Cancellation, DelegateStepHandle, MessageStream, StepHandle, StreamConfig,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

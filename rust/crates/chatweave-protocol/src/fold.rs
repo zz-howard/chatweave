@@ -107,10 +107,16 @@ impl FoldState {
     }
     /// An invalid event never leaves a partially mutated state.
     pub fn apply(&mut self, event: StreamEvent) -> Result<()> {
+        *self = self.applied(event)?;
+        Ok(())
+    }
+    /// Returns the state after `event`, leaving `self` untouched. Callers that
+    /// need a candidate state use this instead of cloning before `apply`,
+    /// which would copy the whole message twice per event.
+    pub fn applied(&self, event: StreamEvent) -> Result<Self> {
         let mut candidate = self.clone();
         candidate.apply_inner(event)?;
-        *self = candidate;
-        Ok(())
+        Ok(candidate)
     }
     fn apply_inner(&mut self, event: StreamEvent) -> Result<()> {
         let e = &event.0;

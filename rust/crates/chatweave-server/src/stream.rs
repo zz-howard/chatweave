@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, watch};
 use tokio::time::Instant;
 
 pub fn now_rfc3339() -> String {
@@ -45,6 +45,62 @@ impl StreamConfig {
 #[derive(Clone)]
 pub struct MessageStream {
     pub(crate) inner: Arc<Mutex<Inner>>,
+    cancel: Arc<watch::Sender<bool>>,
+}
+
+/// Producer-side cancellation signal. It fires when the message is stopped or
+/// otherwise ended early (limit, expiry, failure, recovery), so in-flight model
+/// or tool work can be abandoned instead of running to completion.
+#[derive(Clone)]
+pub struct Cancellation(watch::Receiver<bool>);
+
+impl Cancellation {
+    pub fn is_cancelled(&self) -> bool {
+        *self.0.borrow()
+    }
+    /// Resolves once cancellation is requested (or the stream is dropped).
+    pub async fn cancelled(&mut self) {
+        let _ = self.0.wait_for(|cancelled| *cancelled).await;
+    }
+}
+
+/// Bytes kept free in every non-final message so the library can always
+/// append its own closing sequence (block/step ends and `message.end`).
+const CLOSING_BASE_BYTES: usize = 2048;
+const CLOSING_BLOCK_BYTES: usize = 256;
+const CLOSING_STEP_BYTES: usize = 64;
+
+fn is_limit(error: &Error) -> bool {
+    matches!(error, Error::Protocol(message) if message.contains("limit_exceeded"))
+}
+
+fn json_len(text: &str) -> usize {
+    serde_json::to_string(text).map_or(usize::MAX, |encoded| encoded.len())
+}
+
+/// Longest prefix (plus an ellipsis when truncated) whose JSON string encoding
+/// adds at most `budget` bytes compared with an empty string.
+fn fit_text(text: &str, budget: usize) -> String {
+    if json_len(text) - 2 <= budget {
+        return text.to_owned();
+    }
+    let budget = budget.saturating_sub('…'.len_utf8());
+    let mut used = 0;
+    let mut output = String::new();
+    for character in text.chars() {
+        let mut buffer = [0; 4];
+        let cost = json_len(character.encode_utf8(&mut buffer)) - 2;
+        if used + cost > budget {
+            break;
+        }
+        used += cost;
+        output.push(character);
+    }
+    if output.trim().is_empty() {
+        return String::new();
+    }
+    output.push('…');
+    output
 }
 
 pub(crate) struct StepClock {
@@ -69,6 +125,7 @@ pub(crate) struct Inner {
     last_checkpoint: Instant,
     failed: bool,
     fallback: String,
+    cancel: Arc<watch::Sender<bool>>,
 }
 
 impl Inner {
@@ -130,8 +187,7 @@ impl Inner {
             .validate(DocumentKind::Event, &value)
             .map_err(protocol_error)?;
         let event = StreamEvent(value);
-        let mut candidate = self.folder.clone();
-        candidate.apply(event.clone()).map_err(protocol_error)?;
+        let candidate = self.folder.applied(event.clone()).map_err(protocol_error)?;
         let mut candidate_message = candidate.message().map_err(protocol_error)?;
         let next_fallback = if candidate_message.status() == "streaming"
             && event.0["type"]
@@ -150,6 +206,21 @@ impl Inner {
         };
         if candidate_message.status() == "streaming" {
             candidate_message.0["fallbackText"] = json!(next_fallback);
+        }
+        // The fold checks the size cap with an empty streaming fallback. The
+        // persisted message carries the real fallback, and closing must still
+        // fit afterwards, so the cap is checked against both here.
+        if matches!(candidate_message.status(), "streaming" | "paused") {
+            let size = serde_json::to_vec(&candidate_message.0)
+                .map_err(protocol_error)?
+                .len();
+            if size + self.closing_reserve(&candidate_message)
+                > self.validator.limits.max_message_bytes
+            {
+                return Err(Error::Protocol(
+                    "limit_exceeded: message size including fallback and closing reserve".into(),
+                ));
+            }
         }
         if let Some(id) = event.0["blockId"].as_str()
             && let Some(block) = candidate_message.0["blocks"]
@@ -203,6 +274,22 @@ impl Inner {
         self.sink.publish(event).await
     }
 
+    fn closing_reserve(&self, message: &Message) -> usize {
+        let open_blocks = message.0["blocks"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|block| block["status"] == "pending")
+            .count();
+        let active_steps = message.0["steps"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|step| matches!(step["state"].as_str(), Some("running" | "awaiting_user")))
+            .count();
+        CLOSING_BASE_BYTES + open_blocks * CLOSING_BLOCK_BYTES + active_steps * CLOSING_STEP_BYTES
+    }
+
     async fn emit(&mut self, value: Value) -> Result<()> {
         let closing = matches!(
             value["type"].as_str(),
@@ -226,7 +313,7 @@ impl Inner {
             return Err(Error::Protocol("limit_exceeded".into()));
         }
         let result = self.emit_unchecked(value).await;
-        if matches!(&result, Err(Error::Protocol(message)) if message.contains("limit_exceeded")) {
+        if result.as_ref().is_err_and(is_limit) {
             self.terminate("limit_exceeded", "Content limit reached", "cancelled")
                 .await?;
         }
@@ -287,7 +374,7 @@ impl Inner {
         if let Some(summary) = summary {
             value["summary"] = json!(summary);
         }
-        self.emit_unchecked(value).await?;
+        self.emit(value).await?;
         if let Some(clock) = self.clocks.get_mut(id) {
             clock.ended = true;
         }
@@ -377,6 +464,73 @@ impl Inner {
         if !matches!(message.status(), "streaming" | "paused") {
             return Ok(());
         }
+        // Signal the producer first so in-flight work stops while we close.
+        self.cancel.send_replace(true);
+        let closing =
+            match self.closing_sequence(&message, code, description, step_state, status, false) {
+                Err(error) if is_limit(&error) => {
+                    // The full closing (buffered text, real fallback) no longer fits.
+                    // Ending is mandatory: drop the unflushed buffer and fit the
+                    // fallback into the remaining budget (streaming.md section 8).
+                    self.closing_sequence(
+                        &message,
+                        "limit_exceeded",
+                        "Content limit reached",
+                        "cancelled",
+                        "interrupted",
+                        true,
+                    )?
+                }
+                other => other?,
+            };
+        let (events, candidate, final_message) = closing;
+        // Publish the complete closing checkpoint before exposing any partial
+        // closing sequence. Snapshots cannot observe an invalid paused state.
+        self.checkpoints
+            .commit(
+                self.timing_checkpoint(final_message, candidate.last_seq()),
+                None,
+            )
+            .await?;
+        for event in &events {
+            if let Err(error) = self.log.append(event.clone()).await {
+                self.failed = true;
+                return Err(error);
+            }
+        }
+        self.folder = candidate;
+        self.pending.clear();
+        for clock in self.clocks.values_mut() {
+            clock.ended = true;
+            clock.since = None;
+        }
+        for event in events {
+            self.sink.publish(event).await?;
+        }
+        Ok(())
+    }
+
+    fn stamp(&self, mut value: Value, seq: u64) -> Result<StreamEvent> {
+        value["protocolVersion"] = json!("0.1");
+        value["messageId"] = json!(self.config.message_id);
+        value["seq"] = json!(seq);
+        self.validator
+            .validate(DocumentKind::Event, &value)
+            .map_err(protocol_error)?;
+        Ok(StreamEvent(value))
+    }
+
+    /// Builds and validates the closing events without side effects. With
+    /// `minimal`, buffered text is dropped and the fallback is trimmed to fit.
+    fn closing_sequence(
+        &self,
+        message: &Message,
+        code: &str,
+        description: &str,
+        step_state: &str,
+        status: &str,
+        minimal: bool,
+    ) -> Result<(Vec<StreamEvent>, FoldState, Message)> {
         let mut values = Vec::new();
         if message.status() == "paused" {
             let state = if code == "interrupt_expired" {
@@ -386,9 +540,15 @@ impl Inner {
             };
             values.push(json!({"type":"block.patch","blockId":message.0["interrupt"]["blockId"],"patch":{"data":{"state":state}}}));
         } else {
-            for (id, text) in &self.pending {
-                for chunk in utf8_chunks(text, 4096) {
-                    values.push(json!({"type":"block.delta","blockId":id,"delta":{"text":chunk}}));
+            if !minimal {
+                let mut ids: Vec<_> = self.pending.keys().collect();
+                ids.sort();
+                for id in ids {
+                    for chunk in utf8_chunks(&self.pending[id], 4096) {
+                        values.push(
+                            json!({"type":"block.delta","blockId":id,"delta":{"text":chunk}}),
+                        );
+                    }
                 }
             }
             for block in message.0["blocks"]
@@ -415,69 +575,56 @@ impl Inner {
             .filter(|step| matches!(step["state"].as_str(), Some("running" | "awaiting_user")))
         {
             let id = step["id"].as_str().ok_or(Error::Conflict)?;
-            let clock = self.clocks.get(id).ok_or(Error::Conflict)?;
-            let duration =
-                clock.accumulated + clock.since.map(|since| since.elapsed()).unwrap_or_default();
+            let duration = self.clocks.get(id).map_or(Duration::ZERO, |clock| {
+                clock.accumulated + clock.since.map(|since| since.elapsed()).unwrap_or_default()
+            });
             values.push(json!({"type":"step.finished","stepId":id,"state":step_state,"durationMs":duration.as_millis().min(86_400_000) as u64}));
         }
         let mut candidate = self.folder.clone();
         let mut events = Vec::new();
-        for mut value in values {
-            value["protocolVersion"] = json!("0.1");
-            value["messageId"] = json!(self.config.message_id);
-            value["seq"] = json!(candidate.last_seq() + 1);
-            self.validator
-                .validate(DocumentKind::Event, &value)
-                .map_err(protocol_error)?;
-            let event = StreamEvent(value);
+        for value in values {
+            let event = self.stamp(value, candidate.last_seq() + 1)?;
             candidate.apply(event.clone()).map_err(protocol_error)?;
             events.push(event);
         }
         let preview = candidate.message().map_err(protocol_error)?;
-        let fallback = if status == "error" {
+        let mut fallback = if status == "error" {
             description.to_owned()
         } else {
             markdown::fallback_text(&preview)
         };
-        let end = StreamEvent(
-            json!({"protocolVersion":"0.1","messageId":self.config.message_id,"seq":candidate.last_seq()+1,"type":"message.end","ts":now_rfc3339(),"status":status,"rev":1,"fallbackText":fallback,"blockCount":preview.0["blocks"].as_array().map_or(0, Vec::len),"error":{"code":code,"message":description}}),
-        );
-        self.validator
-            .validate(DocumentKind::Event, &end.0)
-            .map_err(protocol_error)?;
-        candidate.apply(end.clone()).map_err(protocol_error)?;
-        if candidate.last_seq() > self.config.max_events {
-            return Err(Error::Protocol("limit_exceeded".into()));
+        let block_count = preview.0["blocks"].as_array().map_or(0, Vec::len);
+        let end_value = |fallback: &str| json!({"type":"message.end","ts":now_rfc3339(),"status":status,"rev":1,"fallbackText":fallback,"blockCount":block_count,"error":{"code":code,"message":description}});
+        let seq = candidate.last_seq() + 1;
+        if seq > self.config.max_events {
+            return Err(Error::Protocol("limit_exceeded: event budget".into()));
         }
+        if minimal {
+            let limits = &self.validator.limits;
+            let empty = self.stamp(end_value(""), seq)?;
+            let mut bare = candidate.clone();
+            bare.apply(empty.clone()).map_err(protocol_error)?;
+            let message_bytes = serde_json::to_vec(&bare.message().map_err(protocol_error)?.0)
+                .map_err(protocol_error)?
+                .len();
+            let event_bytes = serde_json::to_vec(&empty.0).map_err(protocol_error)?.len();
+            let budget = limits
+                .max_message_bytes
+                .saturating_sub(message_bytes)
+                .min(limits.max_event_bytes.saturating_sub(event_bytes));
+            fallback = fit_text(&fallback, budget);
+            if fallback.is_empty() {
+                fallback = fit_text(description, budget);
+            }
+        }
+        let end = self.stamp(end_value(&fallback), seq)?;
+        candidate.apply(end.clone()).map_err(protocol_error)?;
         let final_message = candidate.message().map_err(protocol_error)?;
         self.validator
             .validate(DocumentKind::Message, &final_message.0)
             .map_err(protocol_error)?;
         events.push(end);
-        // Publish the complete closing checkpoint before exposing any partial
-        // closing sequence. Snapshots cannot observe an invalid paused state.
-        self.checkpoints
-            .commit(
-                self.timing_checkpoint(final_message, candidate.last_seq()),
-                None,
-            )
-            .await?;
-        for event in &events {
-            if let Err(error) = self.log.append(event.clone()).await {
-                self.failed = true;
-                return Err(error);
-            }
-        }
-        self.folder = candidate;
-        self.pending.clear();
-        for clock in self.clocks.values_mut() {
-            clock.ended = true;
-            clock.since = None;
-        }
-        for event in events {
-            self.sink.publish(event).await?;
-        }
-        Ok(())
+        Ok((events, candidate, final_message))
     }
 }
 
@@ -525,7 +672,9 @@ impl MessageStream {
         if let Some(metadata) = &config.metadata {
             message["metadata"] = metadata.clone();
         }
+        let cancel = Arc::new(watch::channel(false).0);
         let mut inner = Inner {
+            cancel: cancel.clone(),
             config,
             validator,
             log,
@@ -546,6 +695,7 @@ impl MessageStream {
             .await?;
         Ok(Self {
             inner: Arc::new(Mutex::new(inner)),
+            cancel,
         })
     }
 
@@ -591,8 +741,11 @@ impl MessageStream {
             .as_str()
             .unwrap_or_default()
             .to_owned();
+        let cancel = Arc::new(watch::channel(false).0);
         Ok(Self {
+            cancel: cancel.clone(),
             inner: Arc::new(Mutex::new(Inner {
+                cancel,
                 config,
                 folder,
                 validator,
@@ -755,7 +908,16 @@ impl MessageStream {
     pub async fn resume(&self, answer: RecordedAnswer) -> Result<()> {
         self.inner.lock().await.resume_locked(answer).await
     }
+    /// Producers await or `select!` on this to abandon in-flight model and
+    /// tool work when the message is stopped or ended early.
+    pub fn cancellation(&self) -> Cancellation {
+        Cancellation(self.cancel.subscribe())
+    }
+
+    /// Stopping cancels generation: the producer's [`Cancellation`] fires
+    /// before the closing sequence is written (streaming.md section 4.4).
     pub async fn stop(&self) -> Result<()> {
+        self.cancel.send_replace(true);
         self.inner
             .lock()
             .await

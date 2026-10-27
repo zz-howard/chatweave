@@ -6,6 +6,13 @@ use chatweave_protocol::{FoldState, Message, Validator};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+fn strip_last_seq(mut message: Message) -> Message {
+    if let Some(object) = message.0.as_object_mut() {
+        object.remove("lastSeq");
+    }
+    message
+}
+
 /// The host selects streaming messages whose producer lease has expired. A
 /// paused checkpoint is authoritative and survives loss of the event log.
 pub async fn recover_message(
@@ -37,6 +44,14 @@ pub async fn recover_message(
         }
     } else if after == 0 {
         return Err(Error::Unavailable);
+    } else if replay.head > after {
+        // Events after the checkpoint were partly evicted: their content is
+        // lost, but their sequence numbers are taken. Close after the log
+        // head so no seq is ever reused; readers holding the evicted events
+        // reconcile through the final checkpoint (snapshot).
+        let message = folder.message().map_err(crate::protocol_error)?;
+        folder = FoldState::from_checkpoint(strip_last_seq(message), replay.head)
+            .map_err(crate::protocol_error)?;
     }
     let message = folder.message().map_err(crate::protocol_error)?;
     if message.status() != "streaming" {
