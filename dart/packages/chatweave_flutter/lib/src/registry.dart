@@ -1,11 +1,11 @@
+import 'components.dart';
+import 'default_boundary.dart';
+import 'localizations.dart';
+import 'markdown.dart';
 import 'package:chatweave_core/chatweave_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-
-import 'components.dart';
-import 'markdown.dart';
 import 'theme.dart';
-import 'localizations.dart';
 
 typedef BlockWidgetBuilder = Widget Function(BuildContext, Block);
 typedef BlockRenderError = void Function(Block, Object);
@@ -32,7 +32,9 @@ class BlockRegistry {
     final registry = BlockRegistry._(onBlockRenderError);
     registry._entries['markdown'] = [
       BlockRegistration(
-          build: (_, b) => MarkdownBlockView(text: b.data['text'] as String))
+          build: (_, b) => MarkdownBlockView(
+              text: b.data['text'] as String,
+              complete: b['status'] != 'pending'))
     ];
     return registry;
   }
@@ -44,7 +46,15 @@ class BlockRegistry {
         BlockRegistration(
             parse: (_) {},
             placeholder: (_, b) => BlockSkeleton(type: b.type),
-            build: (_, b) => BuiltinBlockView(block: b))
+            build: (context, b) {
+              final scope = InteractionScope.of(context);
+              return BuiltinBlockView(
+                  block: b,
+                  interactions: scope?.interactions,
+                  messageId: scope?.messageId,
+                  composer: scope?.composer,
+                  readOnly: scope?.readOnly ?? false);
+            })
       ];
     }
     return registry;
@@ -86,8 +96,20 @@ class BlockRegistry {
         ],
         'locale': locale
       });
-  Widget render(Block block) => _BlockBoundary(
-      key: ValueKey('${block.id}/${block.type}'), registry: this, block: block);
+  Widget render(Block block,
+          {InteractionController? interactions,
+          String? messageId,
+          InterruptComposerController? composer,
+          bool readOnly = false}) =>
+      InteractionScope(
+          interactions: interactions,
+          messageId: messageId,
+          composer: composer,
+          readOnly: readOnly,
+          child: _BlockBoundary(
+              key: ValueKey('${block.id}/${block.type}'),
+              registry: this,
+              block: block));
 
   Widget build(BuildContext context, Block block,
       [Set<String> visited = const {}]) {
@@ -230,8 +252,13 @@ class _BlockBoundaryState extends State<_BlockBoundary> {
   @override
   Widget build(BuildContext context) => failed
       ? FallbackNote(block: widget.block)
-      : _RenderGuard(
-          onError: fail, child: widget.registry.build(context, widget.block));
+      : DefaultBuildScope(
+          fallback: () => FallbackNote(block: widget.block),
+          report: fail,
+          child: Builder(
+              builder: (context) => _RenderGuard(
+                  onError: fail,
+                  child: widget.registry.build(context, widget.block))));
 }
 
 /// Flutter catches render errors internally, so observe its synchronous reporting
@@ -288,4 +315,26 @@ class _GuardRenderBox extends RenderProxyBox {
         super.paint(context, offset);
       });
   }
+}
+
+class InteractionScope extends InheritedWidget {
+  const InteractionScope(
+      {super.key,
+      this.interactions,
+      this.messageId,
+      this.composer,
+      this.readOnly = false,
+      required super.child});
+  final InteractionController? interactions;
+  final String? messageId;
+  final InterruptComposerController? composer;
+  final bool readOnly;
+  static InteractionScope? of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<InteractionScope>();
+  @override
+  bool updateShouldNotify(InteractionScope oldWidget) =>
+      interactions != oldWidget.interactions ||
+      messageId != oldWidget.messageId ||
+      composer != oldWidget.composer ||
+      readOnly != oldWidget.readOnly;
 }

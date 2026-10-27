@@ -1,4 +1,4 @@
-import 'package:chatweave_flutter/chatweave_flutter.dart' hide StreamController;
+import 'package:chatweave_flutter/chatweave_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' as rendering;
 import 'package:flutter_test/flutter_test.dart';
@@ -158,7 +158,7 @@ void main() {
     }
     expect(document.stableParseCount, stableCount);
     expect(identical(document.stable.first, sealed), isTrue);
-    expect(document.tailParseCount, 101);
+    expect(document.tailParseCount, lessThan(10));
   });
   for (final phase in [
     'unknown',

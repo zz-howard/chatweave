@@ -1,6 +1,6 @@
 import 'dart:async' as async;
-
-import 'package:chatweave_flutter/chatweave_flutter.dart' hide StreamController;
+import 'package:chatweave_core/testing.dart';
+import 'package:chatweave_flutter/chatweave_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -74,6 +74,7 @@ void main() {
       (_) async => throw StateError('offline'),
     ]);
     final interactions = InteractionController(
+        maxAutomaticRetries: 0,
         store: store,
         persistence: persistence,
         nextId: () => 'intent_${++ids}',
@@ -117,6 +118,7 @@ void main() {
       })));
     final persistence = MemoryStore();
     final interactions = InteractionController(
+        maxAutomaticRetries: 0,
         store: store,
         persistence: persistence,
         nextId: () => 'intent',

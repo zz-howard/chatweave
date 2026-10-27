@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'default_boundary.dart';
+
 /// Override [resolve] to supply application wording. Values from the protocol
 /// (titles, labels, errors and body text) are never passed through this resolver.
 class ChatWeaveLocalizations extends InheritedWidget {
@@ -30,6 +32,8 @@ class ChatWeaveLocalizations extends InheritedWidget {
     '取消': 'Cancel',
     '输入其他内容': 'Enter another answer',
     '仅可查看': 'Read only',
+    '重试': 'Retry',
+    '暂时无法确认结果，请重试': 'Could not confirm the result. Please retry.',
     '已排队，联网后提交': 'Queued; will submit when online',
     '暂时无法确认结果，正在刷新…': 'Checking the result…',
     '提交中…': 'Submitting…',
@@ -116,8 +120,9 @@ class DefaultLabel extends StatelessWidget {
   final String label;
   final TextStyle? style;
   @override
-  Widget build(BuildContext context) =>
-      Text(ChatWeaveLocalizations.text(context, label), style: style);
+  Widget build(BuildContext context) => guardedDefaultBuild(context,
+      () => Text(ChatWeaveLocalizations.text(context, label), style: style),
+      emergencyFallback: Text(label, style: style));
 }
 
 String cw(BuildContext context, String key) =>
