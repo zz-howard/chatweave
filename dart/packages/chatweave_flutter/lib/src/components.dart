@@ -384,11 +384,9 @@ class StatusView extends StatelessWidget {
           if (data['progress'] is Map<Object?, Object?>)
             Text(
               '${object(data['progress'])['current']} / ${object(data['progress'])['total']} ${object(data['progress'])['unit'] ?? ''}',
-              style: ChatWeaveTheme.of(context)
-                  .body
-                  .copyWith(
-                      color: ChatWeaveTheme.of(context).onSurface,
-                      fontWeight: FontWeight.w600),
+              style: ChatWeaveTheme.of(context).body.copyWith(
+                  color: ChatWeaveTheme.of(context).onSurface,
+                  fontWeight: FontWeight.w600),
             ),
           for (final step in objects(data['steps']))
             Text('${step['label']} · ${stateLabel(step['state'], context)}'),
