@@ -143,13 +143,13 @@ void main() {
       expect(quotes(nodes), hasLength(2));
     });
     test('mid-line and angle-bracket text stays plain', () {
-      for (final text in ['a > b', '<金额>', '1 < 2 > 0', '<b>x</b>']) {
+      for (final text in ['a > b', '<\u91d1\u989d>', '1 < 2 > 0', '<b>x</b>']) {
         final nodes = parseSafeMarkdown(text);
         expect(quotes(nodes), isEmpty, reason: text);
         expect(nodes.map((n) => n.textContent).join(), text, reason: text);
       }
-      final inQuote = safeMarkdown('> 付 <金额> a > b');
-      expect(inQuote, startsWith('> 付 &lt;金额&gt; a &gt; b'));
+      final inQuote = safeMarkdown('> pay <amount> a > b');
+      expect(inQuote, startsWith('> pay &lt;amount&gt; a &gt; b'));
       expect(safeMarkdown('<script>'), contains('&lt;script&gt;'));
     });
     test('raw html after the marker is still escaped', () {
