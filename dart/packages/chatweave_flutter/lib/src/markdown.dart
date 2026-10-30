@@ -27,16 +27,24 @@ String safeMarkdown(
 }) {
   final output = StringBuffer();
   var fenced = false;
-  for (final line in source.split('\n')) {
+  final quoteMarker = RegExp(r'^ {0,3}(?:>[ \t]?)+');
+  for (final rawLine in source.split('\n')) {
+    // A leading blockquote marker (up to 3 spaces, then one or more '>') is
+    // Markdown structure, not text: keep it raw. Any other '<' or '>' is
+    // still escaped below. Fence detection looks past the marker so a quoted
+    // fence is still treated as code.
+    final prefix = quoteMarker.firstMatch(rawLine)?[0] ?? '';
+    final line = rawLine.substring(prefix.length);
     if (RegExp(r'^\s*(```|~~~)').hasMatch(line)) {
       fenced = !fenced;
-      output.writeln(line);
+      output.writeln(rawLine);
       continue;
     }
     if (fenced) {
-      output.writeln(line);
+      output.writeln(rawLine);
       continue;
     }
+    output.write(prefix);
     // Scan code separately because String.split discards capture groups.
     var offset = 0;
     final code = RegExp(r'(`+)(.*?)\1');
