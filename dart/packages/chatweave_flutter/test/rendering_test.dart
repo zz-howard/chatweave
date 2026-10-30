@@ -118,6 +118,56 @@ void main() {
     expect(allowedLink('data:text/html,x'), isFalse);
     expect(allowedLink('file:/secret', (_) => true), isFalse);
   });
+  group('markdown_blockquote', () {
+    List<md.Element> quotes(List<md.Node> nodes) {
+      final found = <md.Element>[];
+      void walk(md.Node node) {
+        if (node is! md.Element) return;
+        if (node.tag == 'blockquote') found.add(node);
+        node.children?.forEach(walk);
+      }
+
+      nodes.forEach(walk);
+      return found;
+    }
+
+    test('leading marker becomes a blockquote', () {
+      final nodes = parseSafeMarkdown('> quote\n\nafter');
+      expect(quotes(nodes), hasLength(1));
+      expect(quotes(nodes).single.textContent.trim(), 'quote');
+      expect(quotes(parseSafeMarkdown('   >quote')), hasLength(1));
+      expect(quotes(parseSafeMarkdown('    > code')), isEmpty);
+    });
+    test('nested markers nest', () {
+      final nodes = parseSafeMarkdown('> a\n> > b');
+      expect(quotes(nodes), hasLength(2));
+    });
+    test('mid-line and angle-bracket text stays plain', () {
+      for (final text in ['a > b', '<金额>', '1 < 2 > 0', '<b>x</b>']) {
+        final nodes = parseSafeMarkdown(text);
+        expect(quotes(nodes), isEmpty, reason: text);
+        expect(nodes.map((n) => n.textContent).join(), text, reason: text);
+      }
+      final inQuote = safeMarkdown('> 付 <金额> a > b');
+      expect(inQuote, startsWith('> 付 &lt;金额&gt; a &gt; b'));
+      expect(safeMarkdown('<script>'), contains('&lt;script&gt;'));
+    });
+    test('raw html after the marker is still escaped', () {
+      final result = safeMarkdown('> <script>x</script>');
+      expect(result, startsWith('> &lt;script&gt;'));
+      expect(result, isNot(contains('<script>')));
+    });
+    test('code keeps > literally', () {
+      expect(safeMarkdown('`> x`'), contains('`> x`'));
+      expect(safeMarkdown('```\n> x\n<y>\n```'), contains('> x\n<y>'));
+      final fenced = parseSafeMarkdown('```\n> x\n```');
+      expect(quotes(fenced), isEmpty);
+      expect(fenced.single.textContent, contains('> x'));
+      final quotedFence = safeMarkdown('> ```\n> <y>\n> ```\n<z>');
+      expect(quotedFence, contains('> <y>'));
+      expect(quotedFence, contains('&lt;z&gt;'));
+    });
+  });
   test('markdown_parser_removes_reference_images_and_unsafe_reference_links',
       () {
     final nodes = parseSafeMarkdown('![天气][image] [点击][link]\n\n'
