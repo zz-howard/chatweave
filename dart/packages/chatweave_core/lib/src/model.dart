@@ -222,6 +222,8 @@ sealed class BlockData extends WireModel {
         'dataset' => DatasetData(json),
         'time_series' => TimeSeriesData(json),
         'comparison' => ComparisonData(json),
+        'breakdown' => BreakdownData(json),
+        'category_series' => CategorySeriesData(json),
         'status' => StatusData(json),
         'choice' => ChoiceData(json),
         'confirmation' => ConfirmationData(json),
@@ -265,6 +267,16 @@ class ComparisonData extends BlockData {
   List<Json> get subjects => objects(this.json['subjects']);
   List<Json> get attributes => objects(this.json['attributes']);
   List<Json> get values => objects(this.json['values']);
+}
+
+class BreakdownData extends BlockData {
+  BreakdownData(super.json);
+  List<Json> get parts => objects(this.json['parts']);
+}
+
+class CategorySeriesData extends BlockData {
+  CategorySeriesData(super.json);
+  List<Json> get points => objects(this.json['points']);
 }
 
 class StatusData extends BlockData {

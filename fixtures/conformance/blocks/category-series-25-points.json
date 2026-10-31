@@ -1,0 +1,142 @@
+{
+  "id": "b1",
+  "type": "category_series",
+  "schemaVersion": 1,
+  "data": {
+    "title": "城市今日最高气温",
+    "yLabel": "最高气温",
+    "unit": "°C",
+    "points": [
+      {
+        "key": "k0",
+        "label": "0",
+        "value": 0
+      },
+      {
+        "key": "k1",
+        "label": "1",
+        "value": 1
+      },
+      {
+        "key": "k2",
+        "label": "2",
+        "value": 2
+      },
+      {
+        "key": "k3",
+        "label": "3",
+        "value": 3
+      },
+      {
+        "key": "k4",
+        "label": "4",
+        "value": 4
+      },
+      {
+        "key": "k5",
+        "label": "5",
+        "value": 5
+      },
+      {
+        "key": "k6",
+        "label": "6",
+        "value": 6
+      },
+      {
+        "key": "k7",
+        "label": "7",
+        "value": 7
+      },
+      {
+        "key": "k8",
+        "label": "8",
+        "value": 8
+      },
+      {
+        "key": "k9",
+        "label": "9",
+        "value": 9
+      },
+      {
+        "key": "k10",
+        "label": "10",
+        "value": 10
+      },
+      {
+        "key": "k11",
+        "label": "11",
+        "value": 11
+      },
+      {
+        "key": "k12",
+        "label": "12",
+        "value": 12
+      },
+      {
+        "key": "k13",
+        "label": "13",
+        "value": 13
+      },
+      {
+        "key": "k14",
+        "label": "14",
+        "value": 14
+      },
+      {
+        "key": "k15",
+        "label": "15",
+        "value": 15
+      },
+      {
+        "key": "k16",
+        "label": "16",
+        "value": 16
+      },
+      {
+        "key": "k17",
+        "label": "17",
+        "value": 17
+      },
+      {
+        "key": "k18",
+        "label": "18",
+        "value": 18
+      },
+      {
+        "key": "k19",
+        "label": "19",
+        "value": 19
+      },
+      {
+        "key": "k20",
+        "label": "20",
+        "value": 20
+      },
+      {
+        "key": "k21",
+        "label": "21",
+        "value": 21
+      },
+      {
+        "key": "k22",
+        "label": "22",
+        "value": 22
+      },
+      {
+        "key": "k23",
+        "label": "23",
+        "value": 23
+      },
+      {
+        "key": "k24",
+        "label": "24",
+        "value": 24
+      }
+    ],
+    "reference": {
+      "label": "中间值",
+      "value": 22.5
+    }
+  },
+  "fallbackText": "北京18°C，上海缺测，台北27°C"
+}

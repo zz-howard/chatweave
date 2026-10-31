@@ -68,6 +68,14 @@
       "then": { "properties": { "data": { "$ref": "#/$defs/comparisonData" } } }
     },
     {
+      "if": { "properties": { "type": { "const": "breakdown" } } },
+      "then": { "properties": { "data": { "$ref": "#/$defs/breakdownData" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "category_series" } } },
+      "then": { "properties": { "data": { "$ref": "#/$defs/categorySeriesData" } } }
+    },
+    {
       "if": { "properties": { "type": { "const": "status" } } },
       "then": { "properties": { "data": { "$ref": "#/$defs/statusData" } } }
     },
@@ -180,6 +188,8 @@
             "dataset",
             "time_series",
             "comparison",
+            "breakdown",
+            "category_series",
             "status",
             "choice",
             "confirmation",
@@ -721,6 +731,75 @@
           }
         },
         "conclusion": { "$ref": "#/$defs/text" }
+      }
+    },
+    "breakdownData": {
+      "description": "Parts of one whole, e.g. spending by category. Values are non-negative and share one unit; the producer merges small parts into one part (mergedCount) and sends at most 12. The renderer picks the chart (donut, stacked bar or list).",
+      "type": "object",
+      "required": ["parts"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "$ref": "#/$defs/label" },
+        "unit": { "$ref": "#/$defs/unit" },
+        "format": { "$ref": "#/$defs/valueFormat" },
+        "total": { "type": "number", "minimum": 0 },
+        "parts": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "required": ["key", "label", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "key": { "$ref": "#/$defs/key" },
+              "label": { "$ref": "#/$defs/label" },
+              "value": { "type": "number", "minimum": 0 },
+              "mergedCount": { "type": "integer", "minimum": 2 }
+            }
+          }
+        },
+        "asOf": { "$ref": "#/$defs/temporal" },
+        "summary": { "$ref": "#/$defs/text" }
+      }
+    },
+    "categorySeriesData": {
+      "description": "One value per discrete category or period bucket (e.g. spending per member, per month), shown in the producer's order. For a continuous trend use time_series. The renderer picks the chart (bars by default).",
+      "type": "object",
+      "required": ["points"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "$ref": "#/$defs/label" },
+        "xLabel": { "$ref": "#/$defs/label" },
+        "yLabel": { "$ref": "#/$defs/label" },
+        "unit": { "$ref": "#/$defs/unit" },
+        "format": { "$ref": "#/$defs/valueFormat" },
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 24,
+          "items": {
+            "type": "object",
+            "required": ["key", "label", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "key": { "$ref": "#/$defs/key" },
+              "label": { "$ref": "#/$defs/label" },
+              "value": { "type": ["number", "null"] },
+              "assessment": { "$ref": "#/$defs/assessment" }
+            }
+          }
+        },
+        "reference": {
+          "type": "object",
+          "required": ["label", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "label": { "$ref": "#/$defs/label" },
+            "value": { "type": "number" }
+          }
+        },
+        "summary": { "$ref": "#/$defs/text" }
       }
     },
     "statusData": {

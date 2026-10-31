@@ -68,6 +68,18 @@ data_struct!(ComparisonValue {
     value: Scalar
 });
 data_struct!(ComparisonData { subjects: Vec<Subject>, attributes: Vec<Attribute>, values: Vec<ComparisonValue> });
+data_struct!(BreakdownPart {
+    key: String,
+    label: String,
+    value: Number
+});
+data_struct!(BreakdownData { parts: Vec<BreakdownPart> });
+data_struct!(CategoryPoint {
+    key: String,
+    label: String,
+    value: Option<Number>
+});
+data_struct!(CategorySeriesData { points: Vec<CategoryPoint> });
 data_struct!(StatusData {
     label: String,
     state: String
@@ -101,6 +113,8 @@ pub enum BlockData {
     Dataset(DatasetData),
     TimeSeries(TimeSeriesData),
     Comparison(ComparisonData),
+    Breakdown(BreakdownData),
+    CategorySeries(CategorySeriesData),
     Status(StatusData),
     Choice(ChoiceData),
     Confirmation(ConfirmationData),
@@ -123,6 +137,8 @@ impl BlockData {
             "dataset" => parse!(DatasetData, Dataset),
             "time_series" => parse!(TimeSeriesData, TimeSeries),
             "comparison" => parse!(ComparisonData, Comparison),
+            "breakdown" => parse!(BreakdownData, Breakdown),
+            "category_series" => parse!(CategorySeriesData, CategorySeries),
             "status" => parse!(StatusData, Status),
             "choice" => parse!(ChoiceData, Choice),
             "confirmation" => parse!(ConfirmationData, Confirmation),
@@ -144,6 +160,8 @@ impl BlockData {
             Self::Dataset(v) => value!(v),
             Self::TimeSeries(v) => value!(v),
             Self::Comparison(v) => value!(v),
+            Self::Breakdown(v) => value!(v),
+            Self::CategorySeries(v) => value!(v),
             Self::Status(v) => value!(v),
             Self::Choice(v) => value!(v),
             Self::Confirmation(v) => value!(v),

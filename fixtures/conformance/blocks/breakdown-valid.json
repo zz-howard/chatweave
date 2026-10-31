@@ -1,0 +1,38 @@
+{
+  "id": "b1",
+  "type": "breakdown",
+  "schemaVersion": 1,
+  "data": {
+    "title": "待办状态",
+    "unit": "项",
+    "format": {
+      "style": "integer"
+    },
+    "total": 20,
+    "parts": [
+      {
+        "key": "done",
+        "label": "已完成",
+        "value": 9
+      },
+      {
+        "key": "todo",
+        "label": "待处理",
+        "value": 5
+      },
+      {
+        "key": "paused",
+        "label": "暂停",
+        "value": 4
+      },
+      {
+        "key": "other",
+        "label": "其他（3 个）",
+        "value": 2,
+        "mergedCount": 3
+      }
+    ],
+    "summary": "已完成的最高"
+  },
+  "fallbackText": "待办20项：已完成9、待处理5、暂停4、其他2"
+}

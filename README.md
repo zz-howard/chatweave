@@ -1,6 +1,6 @@
 # ChatWeave
 
-> **ChatWeave** is a Markdown-first, hybrid Generative UI library for chat apps. Agents keep answering in streaming Markdown, and when information really is structured (metrics, tables, time series, comparisons, status, choices, confirmations, forms) they emit validated **semantic blocks** that the client renders with native components. Text and components interleave in one message. ChatWeave ships a language-neutral protocol with JSON Schemas, Rust crates for the server (types, validation, an SSE stream emitter for Axum, an action registry) and Dart/Flutter workspace scaffolds for the planned client implementation. It knows nothing about any host's business domain. **Status: CW1 Rust core (T0–T4) implemented; build-machine validation pending.**
+> **ChatWeave** is a Markdown-first, hybrid Generative UI library for chat apps. Agents keep answering in streaming Markdown, and when information really is structured (metrics, tables, time series, comparisons, breakdowns, category series, status, choices, confirmations, forms) they emit validated **semantic blocks** that the client renders with native components. Text and components interleave in one message. ChatWeave ships a language-neutral protocol with JSON Schemas, Rust crates for the server (types, validation, an SSE stream emitter for Axum, an action registry) and Dart/Flutter workspace scaffolds for the planned client implementation. It knows nothing about any host's business domain. **Status: CW1 Rust core (T0–T4) implemented; build-machine validation pending.**
 
 ChatWeave 是一个 **Markdown 优先的混合式生成 UI 聊天库**：回答默认仍是边生成边显示的 Markdown；信息确实适合结构化展示时，Agent 输出经过校验的**语义块**，客户端用原生组件画出来，文字和组件在同一条消息里自然交错。
 
@@ -21,7 +21,7 @@ ChatWeave 的取舍：**让 Agent 决定表达什么，让渲染器决定通常�
 ## 核心特点
 
 - **Markdown 优先**：普通段落、解释、结论保持 Markdown；结构化只在需要时出现。
-- **10 种语义块**：`markdown`、`metric`、`metric_group`、`dataset`、`time_series`、`comparison`、`status`、`choice`、`confirmation`、`form_intent`，外加宿主自定义类型（`x-<host>.<name>`）。
+- **12 种语义块**：`markdown`、`metric`、`metric_group`、`dataset`、`time_series`、`comparison`、`breakdown`、`category_series`、`status`、`choice`、`confirmation`、`form_intent`，外加宿主自定义类型（`x-<host>.<name>`）。
 - **流式**：文字逐步出现；组件先占位、数据到达时整块填满；稳定块 ID、按 ID 补丁、幂等事件、断线续传（SSE + `Last-Event-ID`）、快照回退；持久化版本优先；显式“停止生成”（与断线严格区分）、只用于显示的临时进度提示、按会话找回正在生成的消息。
 - **运行过程看得见**：AI 回答前做的几件事（查数据、对比、交给子 Agent、等你确认）显示在消息顶部的“过程”条里，生成中逐行展开，回答完成后自动收起成一行摘要；子 Agent 的步骤嵌套在委派那一步下面、默认收起；事件对齐 AG-UI 1.0 的步骤与子 Agent 事件，可续传、随消息保存精简记录；只显示宿主写的说明，不显示工具参数、原始数据和模型的思考文字。
 - **问了就在原地等**：运行中途要你确认或回答时，同一条消息暂停，回答记在卡片上（不是一条新的聊天消息），然后同一条消息接着做完；暂停可以持续很久，断线、换设备、服务端重启都能继续；对齐 AG-UI 1.0 的中断与继续。

@@ -96,6 +96,34 @@
       "expectedError": "blocks/comparison-invalid.expected-error.json"
     },
     {
+      "name": "breakdown-valid",
+      "kind": "block",
+      "file": "blocks/breakdown-valid.json",
+      "schema": "content-block.schema.json"
+    },
+    {
+      "name": "breakdown-invalid",
+      "kind": "block",
+      "file": "blocks/breakdown-invalid.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "blocks/breakdown-invalid.expected-error.json"
+    },
+    {
+      "name": "category_series-valid",
+      "kind": "block",
+      "file": "blocks/category_series-valid.json",
+      "schema": "content-block.schema.json"
+    },
+    {
+      "name": "category_series-invalid",
+      "kind": "block",
+      "file": "blocks/category_series-invalid.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "blocks/category_series-invalid.expected-error.json"
+    },
+    {
       "name": "status-valid",
       "kind": "block",
       "file": "blocks/status-valid.json",
@@ -1417,6 +1445,30 @@
       "schema": "content-block.schema.json",
       "rejectAt": "schema",
       "expectedError": "blocks/time-series-501-points.expected-error.json"
+    },
+    {
+      "name": "breakdown-one-part",
+      "kind": "block",
+      "file": "blocks/breakdown-one-part.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "blocks/breakdown-one-part.expected-error.json"
+    },
+    {
+      "name": "breakdown-thirteen-parts",
+      "kind": "block",
+      "file": "blocks/breakdown-thirteen-parts.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "blocks/breakdown-thirteen-parts.expected-error.json"
+    },
+    {
+      "name": "category-series-25-points",
+      "kind": "block",
+      "file": "blocks/category-series-25-points.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "blocks/category-series-25-points.expected-error.json"
     },
     {
       "name": "comparison-too-many-subjects",

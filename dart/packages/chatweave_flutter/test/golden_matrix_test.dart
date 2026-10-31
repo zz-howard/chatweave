@@ -603,7 +603,7 @@ void main() {
                   : 1),
     );
     expect(count, lessThanOrEqualTo(300));
-    expect(count, 232);
+    expect(count, 256);
   });
 }
 
@@ -867,6 +867,26 @@ Block boundary(Block b, {bool maximum = false}) {
                   },
             ]
           : [];
+    case 'breakdown':
+      // The fixture total no longer matches twelve replaced parts.
+      data.remove('total');
+      data['parts'] = [
+        for (var i = 0; i < 12; i++)
+          {
+            'key': 'weather_$i',
+            'label': maximum ? '天气与待办' * 24 : '天气 $i',
+            'value': maximum ? 9999999 - i : i + 1,
+          },
+      ];
+    case 'category_series':
+      data['points'] = [
+        for (var i = 0; i < 24; i++)
+          {
+            'key': 'weather_$i',
+            'label': maximum ? '天气与待办' * 24 : '天气 $i',
+            'value': maximum ? (i.isEven ? 9999999 : -9999999) : i,
+          },
+      ];
     case 'status':
       data['steps'] = [
         for (var i = 0; i < 12; i++) {'label': '待办 $i', 'state': 'succeeded'},
