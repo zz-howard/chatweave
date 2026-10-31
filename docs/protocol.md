@@ -112,6 +112,8 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 | `dataset` | 数据集合（行 × 列） | 表格 | 文本表 / `fallbackText` |
 | `time_series` | 随时间变化的数值 | 简单折线图 | 表格（由数据转换）→ `fallbackText` |
 | `comparison` | 多个对象在多个维度上的比较 | 对比表 | 表格 → `fallbackText` |
+| `breakdown` | 一个整体由哪些部分组成（占比） | 环形图 + 图例 | 表格（由数据转换）→ `fallbackText` |
+| `category_series` | 按类别或分段排列的一组数值（各项比大小） | 柱状图 | 表格（由数据转换）→ `fallbackText` |
 | `status` | 状态与进度（含步骤） | 状态条 / 进度条 | `fallbackText` |
 | `choice` | 请用户从选项中选（如澄清问题） | 选项按钮组 | 编号列表文本，提示用户直接回复 |
 | `confirmation` | 请用户确认或取消某个操作 | 确认卡 | 文本 +“请在新版本中确认” |
@@ -190,6 +192,37 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 }
 ```
 2–6 个比较对象、1–12 个维度；`values` 是扁平的“对象 × 维度”单元格列表，便于校验。
+
+#### `breakdown`
+
+```json
+{
+  "title": "待办状态", "unit": "项", "format": { "style": "integer" },
+  "parts": [
+    { "key": "done", "label": "已完成", "value": 9 },
+    { "key": "todo", "label": "待处理", "value": 5 },
+    { "key": "paused", "label": "暂停", "value": 4 },
+    { "key": "other", "label": "其他（3 个）", "value": 2, "mergedCount": 3 }
+  ],
+  "summary": "已完成的最高"
+}
+```
+2–12 个部分，数值不能为负，共用一个单位。各部分就是整体的全部：小项由生产方合并成一项（用 `mergedCount` 标出合并了几项），整体就是各部分之和，占比也按它计算，所以协议里没有单独的“合计”字段。图表类型（环形 / 堆叠条 / 列表）由渲染器决定。
+
+#### `category_series`
+
+```json
+{
+  "title": "城市今日最高气温", "yLabel": "最高气温", "unit": "°C",
+  "points": [
+    { "key": "bj", "label": "北京", "value": 18 },
+    { "key": "sh", "label": "上海", "value": null },
+    { "key": "tb", "label": "台北", "value": 27, "assessment": { "status": "warning", "label": "较高" } }
+  ],
+  "reference": { "label": "中间值", "value": 22.5 }
+}
+```
+1–24 个点，按生产方给的顺序显示（按时间分段就按时间排，按类别比大小就由生产方先排好序）。`value` 可以为负，`null` 表示没有数据。`reference` 是一条可选参考线（如平均值、目标）；`assessment` 用于标出需要注意的那一项。和 `time_series` 的区别：`time_series` 讲连续的变化趋势，`category_series` 讲几个离散项之间比大小（例如每个成员、每个月一项）。
 
 #### `status`
 
@@ -579,7 +612,7 @@ streaming ──message.paused──▶ paused ──(回答) block.patch + mess
 ```json
 {
   "protocolVersions": ["0.1"],
-  "blocks": { "markdown": 1, "metric": 1, "metric_group": 1, "dataset": 1, "time_series": 1, "status": 1, "choice": 1, "confirmation": 1, "form_intent": 1, "x-todo.task_card": 1 },
+  "blocks": { "markdown": 1, "metric": 1, "metric_group": 1, "dataset": 1, "time_series": 1, "comparison": 1, "breakdown": 1, "category_series": 1, "status": 1, "choice": 1, "confirmation": 1, "form_intent": 1, "x-todo.task_card": 1 },
   "features": ["stream.resume", "stream.snapshot", "stream.activity", "stream.steps", "action.choice", "action.confirmation", "action.form"],
   "locale": "zh-CN"
 }
@@ -632,6 +665,8 @@ ChatWeave-Protocol: 0.1
 | `dataset` 列 / 行 | 12 / 200 |
 | `time_series` 序列 / 每条点数 | 6 / 500 |
 | `comparison` 对象 / 维度 / 单元格 | 6 / 12 / 72 |
+| `breakdown` 部分 | 2–12 |
+| `category_series` 点 | 1–24 |
 | `choice.options` | 10 |
 | `form_intent.fields` / 每字段选项 | 12 / 20 |
 | 普通标签 / 短按钮文字 / 说明文字 | 120 / 24 / 2000 字符 |

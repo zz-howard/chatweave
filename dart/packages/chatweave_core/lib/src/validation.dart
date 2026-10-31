@@ -8,6 +8,8 @@ const builtinTypes = {
   'dataset',
   'time_series',
   'comparison',
+  'breakdown',
+  'category_series',
   'status',
   'choice',
   'confirmation',
@@ -65,6 +67,8 @@ void _validateBlock(Json b, {Limits limits = const Limits()}) {
     'dataset' => ['columns', 'rows'],
     'time_series' => ['series', 'xType'],
     'comparison' => ['subjects', 'attributes', 'values'],
+    'breakdown' => ['parts'],
+    'category_series' => ['points'],
     'status' => ['label', 'state'],
     'choice' => ['prompt', 'options', 'action'],
     'confirmation' => ['title', 'action'],
@@ -77,6 +81,7 @@ void _validateBlock(Json b, {Limits limits = const Limits()}) {
   final definition = switch (b['type']) {
     'metric_group' => 'metricGroupData',
     'time_series' => 'timeSeriesData',
+    'category_series' => 'categorySeriesData',
     'form_intent' => 'formIntentData',
     _ => '${b['type']}Data',
   };

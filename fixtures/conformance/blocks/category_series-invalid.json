@@ -1,0 +1,36 @@
+{
+  "id": "b1",
+  "type": "category_series",
+  "schemaVersion": 1,
+  "data": {
+    "title": "城市今日最高气温",
+    "yLabel": "最高气温",
+    "unit": "°C",
+    "points": [
+      {
+        "key": "bj",
+        "label": "北京",
+        "value": "many"
+      },
+      {
+        "key": "sh",
+        "label": "上海",
+        "value": null
+      },
+      {
+        "key": "tb",
+        "label": "台北",
+        "value": 27,
+        "assessment": {
+          "status": "warning",
+          "label": "较高"
+        }
+      }
+    ],
+    "reference": {
+      "label": "中间值",
+      "value": 22.5
+    }
+  },
+  "fallbackText": "北京18°C，上海缺测，台北27°C"
+}

@@ -18,6 +18,8 @@ void main() {
         'dataset' => 'rows',
         'time_series' => 'series',
         'comparison' => 'subjects',
+        'breakdown' => 'parts',
+        'category_series' => 'points',
         'status' => 'state',
         'choice' => 'options',
         'confirmation' => 'action',

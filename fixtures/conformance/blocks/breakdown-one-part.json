@@ -1,0 +1,21 @@
+{
+  "id": "b1",
+  "type": "breakdown",
+  "schemaVersion": 1,
+  "data": {
+    "title": "待办状态",
+    "unit": "项",
+    "format": {
+      "style": "integer"
+    },
+    "parts": [
+      {
+        "key": "done",
+        "label": "已完成",
+        "value": 9
+      }
+    ],
+    "summary": "已完成的最高"
+  },
+  "fallbackText": "待办20项：已完成9、待处理5、暂停4、其他2"
+}

@@ -40,7 +40,10 @@ class BlockSkeleton extends StatelessWidget {
   Widget buildDefault(BuildContext context) => Semantics(
         label: cw(context, '内容正在生成'),
         child: SizedBox(
-          height: type == 'time_series' ? 180 : 96,
+          height: const ['time_series', 'breakdown', 'category_series']
+                  .contains(type)
+              ? 180
+              : 96,
           child: const Center(child: DefaultLabel('正在生成…')),
         ),
       );
@@ -370,6 +373,319 @@ class _LinePainter extends CustomPainter {
       oldDelegate.series != series || oldDelegate.palette != palette;
 }
 
+/// Palette colour for slice or series [i]; past the palette length the colours
+/// repeat at reduced opacity so neighbouring parts stay distinguishable.
+Color chartColor(List<Color> palette, int i) {
+  final color = palette[i % palette.length];
+  return i < palette.length ? color : color.withValues(alpha: 0.55);
+}
+
+class BreakdownView extends StatelessWidget {
+  const BreakdownView({super.key, required this.data, required this.summary});
+  final Json data;
+  final String summary;
+  @override
+  Widget build(BuildContext context) =>
+      guardedDefaultBuild(context, () => buildDefault(context));
+
+  Widget buildDefault(BuildContext context) {
+    final theme = ChatWeaveTheme.of(context);
+    final parts = objects(data['parts']);
+    final format = object(data['format'] ?? <String, Object?>{});
+    final values = [for (final p in parts) (p['value'] as num).toDouble()];
+    final sum = values.fold<double>(0, (a, b) => a + b);
+    String value(num v) =>
+        '${formatValue(v, format: format, context: context)} ${data['unit'] ?? ''}'
+            .trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (data['title'] != null) Text('${data['title']}', style: theme.title),
+        Semantics(
+          label: summary,
+          child: ExcludeSemantics(
+            child: SizedBox(
+              height: 180,
+              width: double.infinity,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CustomPaint(
+                    size: const Size.square(160),
+                    painter: _DonutPainter(
+                      values,
+                      [
+                        for (var i = 0; i < parts.length; i++)
+                          chartColor(theme.chartPalette, i)
+                      ],
+                      theme.outline,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 96,
+                    child: Text(
+                      value(sum),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.body.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        for (var i = 0; i < parts.length; i++)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, right: 8),
+                  child: ExcludeSemantics(
+                    child: SizedBox.square(
+                      dimension: 10,
+                      child:
+                          ColoredBox(color: chartColor(theme.chartPalette, i)),
+                    ),
+                  ),
+                ),
+                Expanded(
+                    child: Text('${parts[i]['label']}', style: theme.body)),
+                Text(
+                  '${value(values[i])}  '
+                  '${sum > 0 ? (values[i] / sum * 100).toStringAsFixed(values[i] / sum < 0.1 ? 1 : 0) : 0}%',
+                  style: theme.body,
+                ),
+              ],
+            ),
+          ),
+        if (data['summary'] != null)
+          Text('${data['summary']}', style: theme.caption),
+      ],
+    );
+  }
+}
+
+class _DonutPainter extends CustomPainter {
+  _DonutPainter(this.values, this.colors, this.empty);
+  final List<double> values;
+  final List<Color> colors;
+  final Color empty;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = size.shortestSide * 0.18;
+    final rect = Rect.fromCircle(
+      center: size.center(Offset.zero),
+      radius: (size.shortestSide - stroke) / 2,
+    );
+    Paint paint(Color color) => Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..color = color;
+    final sum = values.fold<double>(0, (a, b) => a + b);
+    if (sum <= 0) {
+      canvas.drawArc(rect, 0, 2 * math.pi, false, paint(empty));
+      return;
+    }
+    var start = -math.pi / 2;
+    for (var i = 0; i < values.length; i++) {
+      final sweep = values[i] / sum * 2 * math.pi;
+      // A hairline gap separates neighbouring slices without hiding small ones.
+      final gap = values.where((v) => v > 0).length > 1
+          ? math.min(0.02, sweep / 4)
+          : 0.0;
+      if (sweep > 0) {
+        canvas.drawArc(
+            rect, start + gap / 2, sweep - gap, false, paint(colors[i]));
+      }
+      start += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DonutPainter oldDelegate) =>
+      oldDelegate.values != values || oldDelegate.colors != colors;
+}
+
+class CategorySeriesView extends StatefulWidget {
+  const CategorySeriesView(
+      {super.key, required this.data, required this.summary});
+  final Json data;
+  final String summary;
+  @override
+  State<CategorySeriesView> createState() => _CategorySeriesViewState();
+}
+
+class _CategorySeriesViewState extends State<CategorySeriesView> {
+  bool table = false;
+  @override
+  Widget build(BuildContext context) =>
+      guardedDefaultBuild(context, () => buildDefault(context));
+
+  Widget buildDefault(BuildContext context) {
+    final theme = ChatWeaveTheme.of(context);
+    final data = widget.data;
+    final points = objects(data['points']);
+    final reference = data['reference'] is Map<Object?, Object?>
+        ? object(data['reference'])
+        : null;
+    Color barColor(Json p) =>
+        switch (object(p['assessment'] ?? <String, Object?>{})['status']) {
+          'warning' => theme.warning,
+          'critical' || 'negative' => theme.critical,
+          _ => theme.chartPalette.first,
+        };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (data['title'] != null) Text('${data['title']}', style: theme.title),
+        if (!table)
+          Semantics(
+            label: widget.summary,
+            child: ExcludeSemantics(
+              child: SizedBox(
+                height: 180,
+                width: double.infinity,
+                child: CustomPaint(
+                  painter: _BarPainter(
+                    values: [
+                      for (final p in points) (p['value'] as num?)?.toDouble()
+                    ],
+                    labels: [for (final p in points) '${p['label']}'],
+                    colors: [for (final p in points) barColor(p)],
+                    reference: (reference?['value'] as num?)?.toDouble(),
+                    axis: theme.outline,
+                    text: theme.caption.copyWith(color: theme.muted),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        if (reference != null)
+          Text(
+            '- - ${reference['label']} '
+            '${formatValue(reference['value'], format: object(data['format'] ?? <String, Object?>{}), context: context)}'
+            ' ${data['unit'] ?? ''}',
+            style: theme.caption.copyWith(color: theme.muted),
+          ),
+        if (data['summary'] != null)
+          Text('${data['summary']}', style: theme.caption),
+        ChatWeaveTextButton(
+          onPressed: () => setState(() {
+            table = !table;
+          }),
+          child: DefaultLabel(table ? '查看图表' : '查看数据表'),
+        ),
+        if (table)
+          DataTableView(
+            data: categorySeriesTable(data, context),
+          ),
+      ],
+    );
+  }
+}
+
+Json categorySeriesTable(Json data, [BuildContext? context]) {
+  String say(String key) => context == null ? key : cw(context, key);
+  final format = object(data['format'] ?? <String, Object?>{});
+  return {
+    'columns': [
+      {'key': 'label', 'label': data['xLabel'] ?? say('类别'), 'type': 'string'},
+      {'key': 'value', 'label': data['yLabel'] ?? say('数值'), 'type': 'string'},
+    ],
+    'rows': [
+      for (final p in objects(data['points']))
+        {
+          'label': p['label'],
+          'value': '${formatValue(p['value'], format: format, context: context)}'
+                  ' ${p['value'] == null ? '' : data['unit'] ?? ''}'
+                  '${object(p['assessment'] ?? <String, Object?>{})['label'] == null ? '' : ' · ${object(p['assessment'])['label']}'}'
+              .trim(),
+        },
+    ],
+  };
+}
+
+class _BarPainter extends CustomPainter {
+  _BarPainter({
+    required this.values,
+    required this.labels,
+    required this.colors,
+    required this.reference,
+    required this.axis,
+    required this.text,
+  });
+  final List<double?> values;
+  final List<String> labels;
+  final List<Color> colors;
+  final double? reference;
+  final Color axis;
+  final TextStyle text;
+
+  TextPainter _label(String value, double width) => TextPainter(
+        text: TextSpan(text: value, style: text),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        ellipsis: '…',
+      )..layout(minWidth: width, maxWidth: width);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final known = [
+      for (final v in values)
+        if (v != null) v,
+      if (reference != null) reference!,
+    ];
+    // Bars grow from zero, so the range always includes it.
+    final low = math.min(0.0, known.isEmpty ? 0.0 : known.reduce(math.min));
+    var high = math.max(0.0, known.isEmpty ? 0.0 : known.reduce(math.max));
+    if (high == low) high = low + 1;
+    final labelHeight = _label('0', 10).height + 4;
+    final top = 8.0;
+    final bottom = size.height - labelHeight;
+    double y(double v) => bottom - (v - low) / (high - low) * (bottom - top);
+    final slot = size.width / math.max(1, values.length);
+    final barWidth = math.min(32.0, slot * 0.6);
+    final axisPaint = Paint()
+      ..color = axis
+      ..strokeWidth = 1;
+    canvas.drawLine(Offset(0, y(0)), Offset(size.width, y(0)), axisPaint);
+    for (var i = 0; i < values.length; i++) {
+      final cx = slot * (i + 0.5);
+      final v = values[i];
+      if (v != null) {
+        canvas.drawRect(
+          Rect.fromLTRB(cx - barWidth / 2, y(math.max(v, 0)), cx + barWidth / 2,
+              y(math.min(v, 0))),
+          Paint()..color = colors[i],
+        );
+      }
+      // Labels are skipped when slots get too narrow; the data table has them.
+      if (slot >= 28) {
+        _label(labels[i], slot - 4)
+            .paint(canvas, Offset(slot * i + 2, size.height - labelHeight + 4));
+      }
+    }
+    if (reference != null) {
+      final ry = y(reference!);
+      for (var x = 0.0; x < size.width; x += 8) {
+        canvas.drawLine(
+            Offset(x, ry), Offset(math.min(x + 4, size.width), ry), axisPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_BarPainter oldDelegate) =>
+      oldDelegate.values != values ||
+      oldDelegate.colors != colors ||
+      oldDelegate.reference != reference;
+}
+
 class StatusView extends StatelessWidget {
   const StatusView({super.key, required this.data});
   final Json data;
@@ -471,6 +787,14 @@ class BuiltinBlockView extends StatelessWidget {
             summary: block['fallbackText'] as String? ?? '',
           ),
         'comparison' => ComparisonTable(data: block.data),
+        'breakdown' => BreakdownView(
+            data: block.data,
+            summary: block['fallbackText'] as String? ?? '',
+          ),
+        'category_series' => CategorySeriesView(
+            data: block.data,
+            summary: block['fallbackText'] as String? ?? '',
+          ),
         'status' => StatusView(data: block.data),
         'choice' || 'confirmation' || 'form_intent' => InteractionBlockView(
             block: block,

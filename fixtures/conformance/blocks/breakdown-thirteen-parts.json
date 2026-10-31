@@ -1,0 +1,81 @@
+{
+  "id": "b1",
+  "type": "breakdown",
+  "schemaVersion": 1,
+  "data": {
+    "title": "待办状态",
+    "unit": "项",
+    "format": {
+      "style": "integer"
+    },
+    "parts": [
+      {
+        "key": "p0",
+        "label": "待办0",
+        "value": 0
+      },
+      {
+        "key": "p1",
+        "label": "待办1",
+        "value": 1
+      },
+      {
+        "key": "p2",
+        "label": "待办2",
+        "value": 2
+      },
+      {
+        "key": "p3",
+        "label": "待办3",
+        "value": 3
+      },
+      {
+        "key": "p4",
+        "label": "待办4",
+        "value": 4
+      },
+      {
+        "key": "p5",
+        "label": "待办5",
+        "value": 5
+      },
+      {
+        "key": "p6",
+        "label": "待办6",
+        "value": 6
+      },
+      {
+        "key": "p7",
+        "label": "待办7",
+        "value": 7
+      },
+      {
+        "key": "p8",
+        "label": "待办8",
+        "value": 8
+      },
+      {
+        "key": "p9",
+        "label": "待办9",
+        "value": 9
+      },
+      {
+        "key": "p10",
+        "label": "待办10",
+        "value": 10
+      },
+      {
+        "key": "p11",
+        "label": "待办11",
+        "value": 11
+      },
+      {
+        "key": "p12",
+        "label": "待办12",
+        "value": 12
+      }
+    ],
+    "summary": "已完成的最高"
+  },
+  "fallbackText": "待办20项：已完成9、待处理5、暂停4、其他2"
+}

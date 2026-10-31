@@ -9,6 +9,8 @@
     "dataset": 1,
     "time_series": 1,
     "comparison": 1,
+    "breakdown": 1,
+    "category_series": 1,
     "status": 1,
     "choice": 1,
     "confirmation": 1,

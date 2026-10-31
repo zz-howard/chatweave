@@ -195,6 +195,50 @@ Block? fallbackConversion(Block b, [BuildContext? context]) {
       }
     });
   }
+  if (b.type == 'breakdown') {
+    return Block.fromJson({
+      ...b.json,
+      'type': 'dataset',
+      'data': {
+        'columns': [
+          {'key': 'label', 'label': say('类别'), 'type': 'string'},
+          {
+            'key': 'value',
+            'label': b.data['unit'] ?? say('数值'),
+            'type': 'number'
+          }
+        ],
+        'rows': [
+          for (final p in objects(b.data['parts']))
+            {'label': p['label'], 'value': p['value']}
+        ],
+      }
+    });
+  }
+  if (b.type == 'category_series') {
+    return Block.fromJson({
+      ...b.json,
+      'type': 'dataset',
+      'data': {
+        'columns': [
+          {
+            'key': 'label',
+            'label': b.data['xLabel'] ?? say('类别'),
+            'type': 'string'
+          },
+          {
+            'key': 'value',
+            'label': b.data['unit'] ?? say('数值'),
+            'type': 'number'
+          }
+        ],
+        'rows': [
+          for (final p in objects(b.data['points']))
+            {'label': p['label'], 'value': p['value']}
+        ],
+      }
+    });
+  }
   if (b.type == 'metric_group') {
     return Block.fromJson({
       ...b.json,

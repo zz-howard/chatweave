@@ -17,7 +17,7 @@
 注册表是一张“块类型 → 组件构建器”的表：
 
 ```dart
-final registry = BlockRegistry.withDefaults()          // 内置 10 种类型的默认组件
+final registry = BlockRegistry.withDefaults()          // 内置 12 种类型的默认组件
   ..register<TaskCardData>(
     type: 'x-todo.task_card',
     maxSchemaVersion: 1,
@@ -61,6 +61,8 @@ final registry = BlockRegistry.withDefaults()          // 内置 10 种类型的
 | `dataset` | `DataTableView` | 表头固定；列超出宽度时表格内部横向滚动（页面不横向滚动）；超过 20 行默认折叠“展开全部”；`totalRows` 时显示“显示 N / 共 M 条” |
 | `time_series` | `LineChartView` | 自绘折线（`CustomPainter`），不引入图表库；坐标轴、图例、缺测断线；点按可切换“表格视图” |
 | `comparison` | `ComparisonTable` | 对象为列、维度为行；`assessment` 用主题的语义色 + 文字标签；结论在表下方 |
+| `breakdown` | `BreakdownView` | 自绘环形图，中心显示各部分之和；下方图例逐项列出数值和占比（图例本身就是可读的文字版）；超过调色板长度的部分用降低透明度的同色区分 |
+| `category_series` | `CategorySeriesView` | 自绘柱状图，从零起画（支持负数），`null` 不画柱；参考线为虚线并在图下用文字说明；`assessment` 用主题的提醒色 / 危险色；点按可切换“表格视图” |
 | `status` | `StatusView` | 状态图标 + 文字；有 `progress` 显示进度条；有 `steps` 显示步骤列表 |
 | `choice` | `ChoiceView` | 选项按钮组；单选 / 多选；块是中断的提问且 `otherInput` 不为 `false` 时，选项后面固定多一个“输入其他内容”（点了进入输入框的回答状态，见 4.5）；已经结束的消息里 `allowFreeText` 时提示“也可以直接发消息回答”；点按后整组显示“提交中”；`state` 非 `open` 时显示**服务端记录的**选项、回答者与时间，并禁用 |
 | `confirmation` | `ConfirmationCard` | 标题、说明、细节表；破坏性操作的确认按钮用主题的“危险”样式，且必须二次点按（或按住）才能提交；是中断的块且 `otherInput` 不为 `false` 时按钮下方有“输入其他内容”；点按后显示“提交中”，服务端确认后才显示“已确认 / 已取消” |
@@ -106,7 +108,7 @@ final registry = BlockRegistry.withDefaults()          // 内置 10 种类型的
 
 0. **每个块单独包一层错误边界**：默认组件、注册表工厂的 `parse` / `build` 及边界内同步布局 / 绘制异常会让该块原地换成自己的 `fallbackText`，同一条消息里的其他块照常显示。通过宿主注入的 `onBlockRenderError` 上报，**每个块 ID + 类型只上报一次**（列表反复重建不会刷屏）。
 1. 注册了该类型、`schemaVersion` 不超过支持版本、`parse` 成功、`build` 不抛异常 → 正常组件。
-2. 否则沿 `fallback` 链尝试下一个类型（内置链：`time_series → dataset`、`comparison → dataset`、`metric_group → metric 列表`）。
+2. 否则沿 `fallback` 链尝试下一个类型（内置链：`time_series → dataset`、`comparison → dataset`、`breakdown → dataset`、`category_series → dataset`、`metric_group → metric 列表`）。
 3. 否则显示 `FallbackNote`：块的 `fallbackText`（中性样式，带一个小提示“更新 App 可查看完整内容”，读屏读出文字本身）。
 4. `fallbackText` 也没有 → “此内容无法显示”。
 
