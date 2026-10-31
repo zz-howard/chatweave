@@ -868,8 +868,6 @@ Block boundary(Block b, {bool maximum = false}) {
             ]
           : [];
     case 'breakdown':
-      // The fixture total no longer matches twelve replaced parts.
-      data.remove('total');
       data['parts'] = [
         for (var i = 0; i < 12; i++)
           {

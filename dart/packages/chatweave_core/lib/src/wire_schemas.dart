@@ -1906,7 +1906,7 @@ final Map<String, Object?> wireSchemas = {
       }
     },
     "breakdownData": {
-      "description": "Parts of one whole, e.g. spending by category. Values are non-negative and share one unit; the producer merges small parts into one part (mergedCount) and sends at most 12. The renderer picks the chart (donut, stacked bar or list).",
+      "description": "Parts of one whole, e.g. spending by category. Values are non-negative and share one unit; the producer merges small parts into one part (mergedCount) and sends at most 12. The whole is the sum of the parts. The renderer picks the chart (donut, stacked bar or list).",
       "type": "object",
       "required": [
         "parts"
@@ -1921,10 +1921,6 @@ final Map<String, Object?> wireSchemas = {
         },
         "format": {
           "$ref": "#/$defs/valueFormat"
-        },
-        "total": {
-          "type": "number",
-          "minimum": 0
         },
         "parts": {
           "type": "array",

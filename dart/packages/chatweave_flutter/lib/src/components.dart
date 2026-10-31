@@ -394,7 +394,6 @@ class BreakdownView extends StatelessWidget {
     final format = object(data['format'] ?? <String, Object?>{});
     final values = [for (final p in parts) (p['value'] as num).toDouble()];
     final sum = values.fold<double>(0, (a, b) => a + b);
-    final total = (data['total'] as num?)?.toDouble() ?? sum;
     String value(num v) =>
         '${formatValue(v, format: format, context: context)} ${data['unit'] ?? ''}'
             .trim();
@@ -425,7 +424,7 @@ class BreakdownView extends StatelessWidget {
                   SizedBox(
                     width: 96,
                     child: Text(
-                      value(total),
+                      value(sum),
                       textAlign: TextAlign.center,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -594,7 +593,7 @@ Json categorySeriesTable(Json data, [BuildContext? context]) {
   final format = object(data['format'] ?? <String, Object?>{});
   return {
     'columns': [
-      {'key': 'label', 'label': data['xLabel'] ?? say('项目'), 'type': 'string'},
+      {'key': 'label', 'label': data['xLabel'] ?? say('类别'), 'type': 'string'},
       {'key': 'value', 'label': data['yLabel'] ?? say('数值'), 'type': 'string'},
     ],
     'rows': [

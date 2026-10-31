@@ -82,6 +82,7 @@ class ChatWeaveLocalizations extends InheritedWidget {
     '时间': 'Time',
     '数值': 'Value',
     '项目': 'Attribute',
+    '类别': 'Category',
     '回答者：': 'Answered by: ',
     '步': 'steps',
     '图片：': 'Image: ',

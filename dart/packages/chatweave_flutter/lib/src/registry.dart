@@ -201,7 +201,7 @@ Block? fallbackConversion(Block b, [BuildContext? context]) {
       'type': 'dataset',
       'data': {
         'columns': [
-          {'key': 'label', 'label': say('项目'), 'type': 'string'},
+          {'key': 'label', 'label': say('类别'), 'type': 'string'},
           {
             'key': 'value',
             'label': b.data['unit'] ?? say('数值'),
@@ -223,7 +223,7 @@ Block? fallbackConversion(Block b, [BuildContext? context]) {
         'columns': [
           {
             'key': 'label',
-            'label': b.data['xLabel'] ?? say('项目'),
+            'label': b.data['xLabel'] ?? say('类别'),
             'type': 'string'
           },
           {
