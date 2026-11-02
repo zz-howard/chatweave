@@ -19,7 +19,17 @@ class ChatWeaveThemeData {
     this.numeric = const TextStyle(fontSize: 28, fontWeight: FontWeight.w600),
     this.spacing = 12,
     this.radius = 12,
-  });
+    Color? answerBackground,
+    Color? answerForeground,
+    this.answer = const TextStyle(fontSize: 16, height: 1.5),
+  })  : answerBackground = answerBackground ??
+            (brightness == Brightness.dark
+                ? const Color(0xFF2A3038)
+                : const Color(0xFFEDEFF2)),
+        answerForeground = answerForeground ??
+            (brightness == Brightness.dark
+                ? const Color(0xFFF2F3F5)
+                : const Color(0xFF17191C));
   factory ChatWeaveThemeData.neutralLight() => const ChatWeaveThemeData(
         brightness: Brightness.light,
         surface: Color(0xFFFFFFFF),
@@ -74,6 +84,16 @@ class ChatWeaveThemeData {
   final TextStyle numeric;
   final double spacing;
   final double radius;
+
+  /// Fill of the capsule that shows an answered question's answer (a picked
+  /// option, or text typed through 'other input'). Neutral grey by default.
+  final Color answerBackground;
+
+  /// Text and check mark on [answerBackground].
+  final Color answerForeground;
+
+  /// Text style of the answer capsule (regular weight; it may wrap).
+  final TextStyle answer;
 }
 
 class ChatWeaveTheme extends InheritedWidget {

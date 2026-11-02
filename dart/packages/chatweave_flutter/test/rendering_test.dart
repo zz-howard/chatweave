@@ -366,6 +366,105 @@ void main() {
           contrastRatio(theme.muted, theme.surface), greaterThanOrEqualTo(4.5));
       expect(contrastRatio(theme.accent, theme.surface),
           greaterThanOrEqualTo(4.5));
+      expect(contrastRatio(theme.answerForeground, theme.answerBackground),
+          greaterThanOrEqualTo(4.5));
+    }
+  });
+  test('answer_capsule_tokens_default_by_brightness_and_can_be_mapped', () {
+    final light = ChatWeaveThemeData.neutralLight();
+    final dark = ChatWeaveThemeData.neutralDark();
+    expect(light.answerBackground, const Color(0xFFEDEFF2));
+    expect(light.answerForeground, const Color(0xFF17191C));
+    expect(dark.answerBackground, const Color(0xFF2A3038));
+    expect(dark.answerForeground, const Color(0xFFF2F3F5));
+    expect(light.answer.fontWeight, isNull);
+    const mapped = ChatWeaveThemeData(
+      brightness: Brightness.light,
+      surface: Color(0xFFFFFFFF),
+      onSurface: Color(0xFF000000),
+      muted: Color(0xFF444444),
+      outline: Color(0xFF666666),
+      accent: Color(0xFF0000AA),
+      onAccent: Color(0xFFFFFFFF),
+      warning: Color(0xFF664400),
+      critical: Color(0xFF990000),
+      chartPalette: [Color(0xFF0000AA)],
+      answerBackground: Color(0xFFFFF2B3),
+      answerForeground: Color(0xFF3D2E00),
+    );
+    expect(mapped.answerBackground, const Color(0xFFFFF2B3));
+    expect(mapped.answerForeground, const Color(0xFF3D2E00));
+  });
+  Block answeredChoice(Map<String, Object?> state) {
+    const options = [
+      {'id': 'bj', 'label': '北京'},
+      {'id': 'sh', 'label': '上海'},
+    ];
+    return Block.fromJson({
+      'id': 'b1',
+      'type': 'choice',
+      'schemaVersion': 1,
+      'fallbackText': '请选择北京或上海',
+      'data': {
+        'prompt': '查哪个城市？',
+        'options': options,
+        'selection': 'single',
+        'action': {'type': 'choice.select', 'target': 'weather.select'},
+        'state': state,
+      },
+    });
+  }
+
+  testWidgets('answered_choice_shows_only_the_picked_option', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final b = answeredChoice({
+      'status': 'resolved',
+      'resolvedAt': '2026-10-26T09:31:00Z',
+      'selected': ['bj'],
+    });
+    validateBlock(b.json);
+    await tester.pumpWidget(app(BuiltinBlockView(block: b)));
+    expect(find.byType(AnswerCapsule), findsOneWidget);
+    expect(find.byKey(const ValueKey('chatweave-answer-bj')), findsOneWidget);
+    expect(find.text('上海'), findsNothing);
+    expect(find.byType(ChatWeaveTextButton), findsNothing);
+    expect(find.text('已回答：北京'), findsNothing);
+    expect(find.bySemanticsLabel('已回答：北京'), findsOneWidget);
+    semantics.dispose();
+  });
+  testWidgets('free_text_answer_is_one_capsule_without_summary_line',
+      (tester) async {
+    final semantics = tester.ensureSemantics();
+    final b = answeredChoice({
+      'status': 'resolved',
+      'resolvedAt': '2026-10-26T09:31:00Z',
+      'freeText': '先保留这条待办',
+    });
+    validateBlock(b.json);
+    await tester.pumpWidget(app(BuiltinBlockView(block: b)));
+    expect(find.byType(AnswerCapsule), findsOneWidget);
+    expect(find.text('先保留这条待办'), findsOneWidget);
+    expect(find.text('你的回答：先保留这条待办'), findsNothing);
+    expect(find.text('北京'), findsNothing);
+    expect(find.text('上海'), findsNothing);
+    expect(find.bySemanticsLabel('你的回答：先保留这条待办'), findsOneWidget);
+    semantics.dispose();
+  });
+  testWidgets('unanswered_endings_keep_summary_and_options', (tester) async {
+    for (final state in [
+      {'status': 'expired'},
+      {
+        'status': 'cancelled',
+        'reason': {'code': 'stopped'},
+      },
+    ]) {
+      final b = answeredChoice(state);
+      validateBlock(b.json);
+      await tester.pumpWidget(app(BuiltinBlockView(block: b)));
+      expect(find.byType(AnswerCapsule), findsNothing);
+      expect(find.text(interactionSummary(b)), findsOneWidget);
+      expect(find.text('北京'), findsOneWidget);
+      expect(find.text('上海'), findsOneWidget);
     }
   });
 }

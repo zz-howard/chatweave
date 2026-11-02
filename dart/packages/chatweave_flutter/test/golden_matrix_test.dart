@@ -466,6 +466,30 @@ List<Stage> stages() {
       sensitive: true,
     ),
   );
+  // A long answer typed through 'other input' wraps inside its capsule.
+  stages.add(
+    Stage(
+      'choice',
+      'free_text_long',
+      () {
+        final b = fixture('choice');
+        return BuiltinBlockView(
+          block: Block.fromJson({
+            ...b.json,
+            'data': {
+              ...b.data,
+              'state': {
+                'status': 'resolved',
+                'resolvedAt': '2026-10-26T09:31:00Z',
+                'freeText': '先保留这条待办，${'天气与待办的最长标签需要完整阅读' * 3}',
+              },
+            },
+          }),
+        );
+      },
+      sensitive: true,
+    ),
+  );
   stages.add(
     Stage('choice', 'multiple_selection', () {
       final b = fixture('choice');
@@ -603,7 +627,7 @@ void main() {
                   : 1),
     );
     expect(count, lessThanOrEqualTo(300));
-    expect(count, 256);
+    expect(count, 258);
   });
 }
 

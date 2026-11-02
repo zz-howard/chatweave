@@ -872,13 +872,28 @@ class _InteractionBlockViewState extends State<InteractionBlockView> {
               !local.locked &&
               !widget.readOnly &&
               widget.interactions?.transport != null;
+          // An answered question keeps only its answer: the picked option(s)
+          // or the text typed through 'other input', each as a selected
+          // capsule. Other endings (expired, withdrawn, stopped, superseded)
+          // keep the summary line and the inactive controls.
+          final serverState = object(b.data['state'] ?? <String, Object?>{});
+          final resolved = serverState['status'] == 'resolved';
+          final freeText = resolved && serverState['freeText'] is String
+              ? serverState['freeText'] as String
+              : null;
+          final picked = resolved && freeText == null && b.type == 'choice'
+              ? (serverState['selected'] as List<Object?>? ?? const [])
+                  .whereType<String>()
+                  .toSet()
+              : const <String>{};
+          final answered = freeText != null || picked.isNotEmpty;
           final children = <Widget>[
             Text(
               '${b.data['prompt'] ?? b.data['title'] ?? ''}',
               style: ChatWeaveTheme.of(context).title,
             ),
             if (b.data['body'] != null) Text('${b.data['body']}'),
-            if (!open) Text(interactionSummary(b, context)),
+            if (!open && !answered) Text(interactionSummary(b, context)),
             if (!open && object(b.data['state'])['resolvedBy'] != null)
               Text(
                 '${cw(context, '回答者：')}${object(b.data['state'])['resolvedBy']}',
@@ -913,7 +928,44 @@ class _InteractionBlockViewState extends State<InteractionBlockView> {
             );
           }
 
-          if (b.type == 'choice') {
+          if (b.type == 'confirmation') {
+            for (final detail in objects(b.data['details'])) {
+              children.add(
+                Text(
+                  '${detail['label']}: '
+                  '${formatValue(detail['value'], context: context, format: object(detail['format'] ?? <String, Object?>{}))}'
+                  ' ${detail['unit'] ?? ''}',
+                ),
+              );
+            }
+          }
+          if (answered) {
+            children.add(
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (freeText != null)
+                      AnswerCapsule(
+                        key: const ValueKey('chatweave-answer-free-text'),
+                        label: freeText,
+                        semanticsPrefix: '你的回答：',
+                      )
+                    else
+                      for (final option in objects(b.data['options']))
+                        if (picked.contains(option['id']))
+                          AnswerCapsule(
+                            key: ValueKey('chatweave-answer-${option['id']}'),
+                            label: '${option['label']}',
+                            semanticsPrefix: '已回答：',
+                          ),
+                  ],
+                ),
+              ),
+            );
+          } else if (b.type == 'choice') {
             children.add(
               Wrap(
                 spacing: 8,
@@ -950,15 +1002,6 @@ class _InteractionBlockViewState extends State<InteractionBlockView> {
               );
             }
           } else if (b.type == 'confirmation') {
-            for (final detail in objects(b.data['details'])) {
-              children.add(
-                Text(
-                  '${detail['label']}: '
-                  '${formatValue(detail['value'], context: context, format: object(detail['format'] ?? <String, Object?>{}))}'
-                  ' ${detail['unit'] ?? ''}',
-                ),
-              );
-            }
             children.add(
               Wrap(
                 spacing: 8,
@@ -1167,6 +1210,90 @@ class _InteractionBlockViewState extends State<InteractionBlockView> {
       },
     );
   }
+}
+
+/// The answer of an answered question: a selected capsule with a check mark.
+/// [label] may wrap to several lines; the check stays with the first line.
+/// Colours and text style come from [ChatWeaveThemeData.answerBackground],
+/// [ChatWeaveThemeData.answerForeground] and [ChatWeaveThemeData.answer].
+/// Screen readers hear the localized [semanticsPrefix] before [label].
+class AnswerCapsule extends StatelessWidget {
+  const AnswerCapsule({
+    super.key,
+    required this.label,
+    this.semanticsPrefix = '你的回答：',
+  });
+  final String label;
+
+  /// A library default literal resolved through [ChatWeaveLocalizations].
+  final String semanticsPrefix;
+  @override
+  Widget build(BuildContext context) {
+    final theme = ChatWeaveTheme.of(context);
+    final style = theme.answer.copyWith(color: theme.answerForeground);
+    final scaler = MediaQuery.textScalerOf(context);
+    final lineHeight =
+        scaler.scale(style.fontSize ?? 16) * (style.height ?? 1.2);
+    final check = scaler.scale(16).clamp(16.0, 32.0);
+    return Semantics(
+      container: true,
+      label: '${cw(context, semanticsPrefix)}$label',
+      excludeSemantics: true,
+      child: DecoratedBox(
+        decoration: ShapeDecoration(
+          color: theme.answerBackground,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(
+              (lineHeight + 16) / 2,
+            ),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: check,
+                height: lineHeight,
+                child: CustomPaint(
+                  painter: _CheckPainter(theme.answerForeground),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Flexible(child: Text(label, style: style)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CheckPainter extends CustomPainter {
+  const _CheckPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width;
+    final top = (size.height - s) / 2;
+    canvas.drawPath(
+      Path()
+        ..moveTo(s * 0.18, top + s * 0.52)
+        ..lineTo(s * 0.42, top + s * 0.76)
+        ..lineTo(s * 0.84, top + s * 0.28),
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(2, s / 8)
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_CheckPainter oldDelegate) => oldDelegate.color != color;
 }
 
 class ChoiceView extends BuiltinBlockView {
