@@ -254,6 +254,82 @@ void main() {
       await store.dispose();
     });
   }
+  // The composer empties once the typed answer is accepted or in flight,
+  // whether or not the server asked to resume; it keeps the text only when
+  // the answer was rejected or its outcome needs a manual retry.
+  for (final outcome in [
+    'queued',
+    'accepted_without_resume',
+    'confirmed_closed_by_refresh',
+    'rejected',
+    'retryable',
+  ]) {
+    test('composer_submit_${outcome}_draft', () async {
+      final store = BlockStore()..apply(SyncMessage(paused('m')));
+      final persistence = MemoryStore();
+      final transport = ScriptedTransport(connections: [], actions: [
+        (request) async => switch (outcome) {
+              'queued' => const ActionSubmission.queued(),
+              'accepted_without_resume' =>
+                ActionSubmission.result(ActionResult.fromJson({
+                  'actionId': request.id,
+                  'status': 'accepted',
+                })),
+              'rejected' => ActionSubmission.result(ActionResult.fromJson({
+                  'actionId': request.id,
+                  'status': 'rejected',
+                  'error': {'code': 'validation_failed', 'message': '请重新回答'},
+                })),
+              _ => throw StateError('offline'),
+            },
+      ]);
+      final interactions = InteractionController(
+          maxAutomaticRetries: 0,
+          store: store,
+          persistence: persistence,
+          nextId: () => 'a',
+          transport: transport,
+          onRefresh: (_) async {
+            if (outcome != 'confirmed_closed_by_refresh') return;
+            // The answer landed: the block closes while the message is
+            // still paused (the resume stream has not arrived yet).
+            store.apply(const ActionPatch('m', 'card', 1, {
+              'data': {
+                'state': {
+                  'status': 'resolved',
+                  'resolvedAt': '2026-10-26T09:31:00Z',
+                  'freeText': '先保留',
+                }
+              }
+            }));
+          });
+      final controller = InterruptComposerController(
+          store: store, interactions: interactions, conversationId: 'c');
+      final draft = Draft();
+      controller.attachDraft(draft);
+      controller.beginOtherInput();
+      draft.text = '先保留';
+      await controller.submitOtherInput(draft.text);
+      final local = interactions.stateFor('m', 'card');
+      expect(local.resumeAccepted, isFalse);
+      expect(store.snapshot.messages['m']!.status, 'paused');
+      expect(
+          local.phase,
+          switch (outcome) {
+            'queued' => InteractionPhase.queued,
+            'rejected' => InteractionPhase.rejected,
+            'retryable' => InteractionPhase.retryable,
+            _ => InteractionPhase.accepted,
+          });
+      final keeps = outcome == 'rejected' || outcome == 'retryable';
+      expect(draft.text, keeps ? '先保留' : '');
+      expect(transport.requests.single['payload'], {'freeText': '先保留'});
+      await controller.dispose();
+      await interactions.dispose();
+      await persistence.dispose();
+      await store.dispose();
+    });
+  }
   test('closed_elsewhere_keeps_draft', () {
     final store = BlockStore()..apply(SyncMessage(paused('m')));
     final interactions = InteractionController(
