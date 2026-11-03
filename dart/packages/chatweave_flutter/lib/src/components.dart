@@ -1044,19 +1044,33 @@ class _InteractionBlockViewState extends State<InteractionBlockView> {
                 key: _form,
                 child: Column(
                   children: [
+                    // Fields never touch: the same gap sits between the
+                    // title and the first field, between fields, and before
+                    // the submit button (outlined host fields would otherwise
+                    // share a border).
                     for (final field in objects(b.data['fields']))
-                      _field(field, enabled, local),
-                    ChatWeaveTextButton(
-                      onPressed: enabled
-                          ? () {
-                              if (_form.currentState!.validate()) {
-                                _form.currentState!.save();
-                                submit({'values': _values});
+                      Padding(
+                        padding: EdgeInsets.only(
+                          top: ChatWeaveTheme.of(context).fieldGap,
+                        ),
+                        child: _field(field, enabled, local),
+                      ),
+                    Padding(
+                      padding: EdgeInsets.only(
+                        top: ChatWeaveTheme.of(context).fieldGap,
+                      ),
+                      child: ChatWeaveTextButton(
+                        onPressed: enabled
+                            ? () {
+                                if (_form.currentState!.validate()) {
+                                  _form.currentState!.save();
+                                  submit({'values': _values});
+                                }
                               }
-                            }
-                          : null,
-                      child:
-                          Text('${b.data['submitLabel'] ?? cw(context, '提交')}'),
+                            : null,
+                        child: Text(
+                            '${b.data['submitLabel'] ?? cw(context, '提交')}'),
+                      ),
                     ),
                   ],
                 ),
@@ -1076,7 +1090,7 @@ class _InteractionBlockViewState extends State<InteractionBlockView> {
             );
           }
           return Padding(
-            padding: const EdgeInsets.all(12),
+            padding: ChatWeaveTheme.of(context).interactionPadding,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: children,

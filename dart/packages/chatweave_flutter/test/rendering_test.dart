@@ -415,6 +415,96 @@ void main() {
     });
   }
 
+  testWidgets('form_fields_are_separated_by_field_gap', (tester) async {
+    final b = Block.fromJson({
+      'id': 'f1',
+      'type': 'form_intent',
+      'schemaVersion': 1,
+      'fallbackText': '新建待办',
+      'data': {
+        'title': '新建待办',
+        'fields': [
+          {'key': 'title', 'label': '事项', 'type': 'text'},
+          {'key': 'note', 'label': '备注', 'type': 'text'},
+        ],
+        'action': {'type': 'form.submit', 'target': 'todo.create'},
+        'state': {'status': 'open'},
+      },
+    });
+    validateBlock(b.json);
+    for (final gap in [12.0, 20.0]) {
+      final base = ChatWeaveThemeData.neutralLight();
+      await tester.pumpWidget(app(ChatWeaveTheme(
+        data: ChatWeaveThemeData(
+          brightness: base.brightness,
+          surface: base.surface,
+          onSurface: base.onSurface,
+          muted: base.muted,
+          outline: base.outline,
+          accent: base.accent,
+          onAccent: base.onAccent,
+          warning: base.warning,
+          critical: base.critical,
+          chartPalette: base.chartPalette,
+          fieldGap: gap,
+        ),
+        child: BuiltinBlockView(key: ValueKey(gap), block: b),
+      )));
+      final fields = find.byType(TextFormField);
+      expect(fields, findsNWidgets(2));
+      // Without a transport the card is read-only, so the '仅可查看' line
+      // is the text right above the first field.
+      final above = tester.getRect(find.text('仅可查看'));
+      final first = tester.getRect(fields.at(0));
+      final second = tester.getRect(fields.at(1));
+      final submit = tester.getRect(find.byType(ChatWeaveTextButton));
+      expect(first.top - above.bottom, gap, reason: 'text → field');
+      expect(second.top - first.bottom, gap, reason: 'field → field');
+      expect(submit.top - second.bottom, gap, reason: 'field → submit');
+    }
+    expect(ChatWeaveThemeData.neutralLight().fieldGap, 12);
+  });
+  testWidgets('interaction_padding_is_a_theme_token', (tester) async {
+    final b = Block.fromJson({
+      'id': 'f2',
+      'type': 'form_intent',
+      'schemaVersion': 1,
+      'fallbackText': '新建待办',
+      'data': {
+        'title': '新建待办',
+        'fields': [
+          {'key': 'title', 'label': '事项', 'type': 'text'},
+        ],
+        'action': {'type': 'form.submit', 'target': 'todo.create'},
+        'state': {'status': 'open'},
+      },
+    });
+    final base = ChatWeaveThemeData.neutralLight();
+    expect(base.interactionPadding, const EdgeInsets.all(12));
+    for (final inset in [12.0, 0.0]) {
+      await tester.pumpWidget(app(ChatWeaveTheme(
+        data: ChatWeaveThemeData(
+          brightness: base.brightness,
+          surface: base.surface,
+          onSurface: base.onSurface,
+          muted: base.muted,
+          outline: base.outline,
+          accent: base.accent,
+          onAccent: base.onAccent,
+          warning: base.warning,
+          critical: base.critical,
+          chartPalette: base.chartPalette,
+          interactionPadding: EdgeInsets.symmetric(horizontal: inset),
+        ),
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: BuiltinBlockView(key: ValueKey(inset), block: b),
+        ),
+      )));
+      expect(tester.getRect(find.text('新建待办')).left, inset);
+      expect(tester.getRect(find.text('新建待办')).top, 0);
+    }
+  });
   testWidgets('answered_choice_shows_only_the_picked_option', (tester) async {
     final semantics = tester.ensureSemantics();
     final b = answeredChoice({
