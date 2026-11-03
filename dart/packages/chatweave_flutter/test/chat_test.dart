@@ -154,7 +154,7 @@ void main() {
     ));
     await tester.tap(find.text('复制'));
     await tester.pump();
-    expect(clipboard, '• first\n• second\n\ncomponent fallback');
+    expect(clipboard, '\u2022 first\n\u2022 second\n\ncomponent fallback');
   });
 
   testWidgets('component_fill_preserves_text_top_left', (tester) async {

@@ -459,7 +459,7 @@ String _plainList(md.Element list, int depth) {
           .map(_plainInline)
           .join('\n'),
     );
-    final prefix = ordered ? '${start + index}. ' : '• ';
+    final prefix = ordered ? '${start + index}. ' : '\u2022 ';
     final indent = '  ' * depth;
     if (own.isNotEmpty) {
       final ownLines = own.split('\n');

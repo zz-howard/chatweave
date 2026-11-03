@@ -41,7 +41,7 @@ void main() {
       ]);
       expect(
         messagePlainText(message),
-        '• outer\n  • inner\n\n3. third\n4. fourth',
+        '\u2022 outer\n  \u2022 inner\n\n3. third\n4. fourth',
       );
     });
 
@@ -98,8 +98,8 @@ void main() {
     });
 
     test('plainTextSummary_truncates_messagePlainText_by_runes', () {
-      final message = messageWith([markdown('A😀BC')]);
-      expect(plainTextSummary(message, 3), 'A😀B');
+      final message = messageWith([markdown('A\u{1F600}BC')]);
+      expect(plainTextSummary(message, 3), 'A\u{1F600}B');
       expect(plainTextSummary(message, -1), '');
     });
   });
