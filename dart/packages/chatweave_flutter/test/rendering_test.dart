@@ -432,6 +432,19 @@ void main() {
     expect(find.bySemanticsLabel('已回答：北京'), findsOneWidget);
     semantics.dispose();
   });
+  testWidgets('answered_choice_with_unknown_ids_keeps_summary_line',
+      (tester) async {
+    final b = answeredChoice({
+      'status': 'resolved',
+      'resolvedAt': '2026-10-26T09:31:00Z',
+      'selected': ['gone'],
+    });
+    await tester.pumpWidget(app(BuiltinBlockView(block: b)));
+    expect(find.byType(AnswerCapsule), findsNothing);
+    expect(find.text(interactionSummary(b)), findsOneWidget);
+    expect(find.text('北京'), findsOneWidget);
+    expect(find.text('上海'), findsOneWidget);
+  });
   testWidgets('free_text_answer_is_one_capsule_without_summary_line',
       (tester) async {
     final semantics = tester.ensureSemantics();

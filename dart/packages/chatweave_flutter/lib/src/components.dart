@@ -886,7 +886,12 @@ class _InteractionBlockViewState extends State<InteractionBlockView> {
                   .whereType<String>()
                   .toSet()
               : const <String>{};
-          final answered = freeText != null || picked.isNotEmpty;
+          // Only ids that name an option of this block count; stale or
+          // unknown ids fall back to the summary line.
+          final pickedOptions = objects(b.data['options'])
+              .where((option) => picked.contains(option['id']))
+              .toList();
+          final answered = freeText != null || pickedOptions.isNotEmpty;
           final children = <Widget>[
             Text(
               '${b.data['prompt'] ?? b.data['title'] ?? ''}',
@@ -954,13 +959,12 @@ class _InteractionBlockViewState extends State<InteractionBlockView> {
                         semanticsPrefix: '你的回答：',
                       )
                     else
-                      for (final option in objects(b.data['options']))
-                        if (picked.contains(option['id']))
-                          AnswerCapsule(
-                            key: ValueKey('chatweave-answer-${option['id']}'),
-                            label: '${option['label']}',
-                            semanticsPrefix: '已回答：',
-                          ),
+                      for (final option in pickedOptions)
+                        AnswerCapsule(
+                          key: ValueKey('chatweave-answer-${option['id']}'),
+                          label: '${option['label']}',
+                          semanticsPrefix: '已回答：',
+                        ),
                   ],
                 ),
               ),
