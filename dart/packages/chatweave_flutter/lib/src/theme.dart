@@ -19,6 +19,8 @@ class ChatWeaveThemeData {
     this.numeric = const TextStyle(fontSize: 28, fontWeight: FontWeight.w600),
     this.spacing = 12,
     this.radius = 12,
+    this.fieldGap = 12,
+    this.interactionPadding = const EdgeInsets.all(12),
     Color? answerBackground,
     Color? answerForeground,
     this.answer = const TextStyle(fontSize: 16, height: 1.5),
@@ -84,6 +86,17 @@ class ChatWeaveThemeData {
   final TextStyle numeric;
   final double spacing;
   final double radius;
+
+  /// Vertical gap around each field of a `form_intent` card: between the
+  /// title and the first field, between stacked fields, and before the
+  /// submit button.
+  final double fieldGap;
+
+  /// Inset of the default choice / confirmation / form_intent view. A host
+  /// that draws an interaction straight on the message column (no card
+  /// around it) can drop the horizontal inset so the text lines up with the
+  /// reply.
+  final EdgeInsetsGeometry interactionPadding;
 
   /// Fill of the capsule that shows an answered question's answer (a picked
   /// option, or text typed through 'other input'). Neutral grey by default.

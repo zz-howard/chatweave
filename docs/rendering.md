@@ -259,6 +259,8 @@ class ChatWeaveThemeData {
   final Color answerBackground;           // 已回答卡片里答案胶囊的底色（默认中性灰：浅色 #EDEFF2，深色 #2A3038）
   final Color answerForeground;           // 答案胶囊的文字与 ✓（默认：浅色 #17191C，深色 #F2F3F5）
   final TextStyle answer;                 // 答案胶囊的文字样式（默认常规字重 16/1.5，可换行）
+  final double fieldGap;                  // form_intent 字段的上下间距：标题与首个字段、字段之间、末个字段与提交按钮（默认 12）
+  final EdgeInsetsGeometry interactionPadding; // 交互块（choice / confirmation / form_intent）默认视图的内边距（默认四周 12；宿主不加卡片外壳时可去掉左右内边距）
 }
 ```
 
