@@ -50,5 +50,8 @@ ChatWeaveThemeData testFontTheme(bool dark) {
       title: base.title.copyWith(fontFamily: 'ChatWeaveTestSans'),
       numeric: base.numeric.copyWith(fontFamily: 'ChatWeaveTestSans'),
       spacing: base.spacing,
-      radius: base.radius);
+      radius: base.radius,
+      answerBackground: base.answerBackground,
+      answerForeground: base.answerForeground,
+      answer: base.answer.copyWith(fontFamily: 'ChatWeaveTestSans'));
 }

@@ -461,17 +461,28 @@ class InterruptComposerController {
     final block = state.block!;
     await interactions.submit(message.id, block.id, {'freeText': text});
     final local = interactions.stateFor(message.id, block.id);
-    if (local.phase == InteractionPhase.rejected) {
-      _draft?.text = text;
-      _set(InterruptComposerState(
-          mode: ComposerMode.answering,
-          message: message,
-          block: block,
-          error: local.error));
-    } else if (local.resumeAccepted ||
-        store.snapshot.messages[message.id]?.status != 'paused') {
-      _draft?.text = '';
-      reconcile();
+    switch (local.phase) {
+      case InteractionPhase.rejected:
+        // The answer was refused: keep the text so it can be corrected.
+        _draft?.text = text;
+        _set(InterruptComposerState(
+            mode: ComposerMode.answering,
+            message: message,
+            block: block,
+            error: local.error));
+      case InteractionPhase.idle:
+      case InteractionPhase.retryable:
+        // Nothing was submitted, or the outcome could not be confirmed and
+        // needs a manual retry: the typed text stays in the composer.
+        break;
+      case InteractionPhase.submitting:
+      case InteractionPhase.queued:
+      case InteractionPhase.confirming:
+      case InteractionPhase.accepted:
+        // The answer is accepted or in flight (queued, awaiting the resume
+        // stream, or being confirmed): it no longer belongs in the composer.
+        _draft?.text = '';
+        reconcile();
     }
   }
 

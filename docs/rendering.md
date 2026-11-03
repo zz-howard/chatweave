@@ -137,7 +137,7 @@ final registry = BlockRegistry.withDefaults()          // 内置 12 种类型的
 | `open`，已排队（离线） | “已排队，联网后提交” | 禁用 |
 | `open`，服务端明确拒绝（`invalid_payload`、`forbidden`、`conflict` 等） | 回到未操作状态，并在块内显示服务端给的 `message`（表单显示 `fieldErrors`） | 可用（重新操作会生成新幂等键） |
 | `open`，`unavailable` 或客户端超时 | “暂时无法确认结果，正在刷新…”；**不说“失败”**，因为动作可能已经执行 | 禁用，直到刷新到服务端状态；重试复用同一幂等键 |
-| `resolved` | 服务端记录的答案（选中的选项 / 文字回答 / 已确认或已取消 / 表单值摘要）+ 回答者与时间（宿主把 `resolvedBy` 解析成显示名；一对一会话里可以不显示回答者）。如果答案不是这台设备点的（群聊里别人先答，或一对一时同一用户在另一台设备上先答），照实显示服务端记录的那个答案。用户在确认卡上点“取消”也在这里，显示“你已取消” | 禁用 |
+| `resolved` | 服务端记录的答案（选中的选项 / 文字回答 / 已确认或已取消 / 表单值摘要）+ 回答者与时间（宿主把 `resolvedBy` 解析成显示名；一对一会话里可以不显示回答者）。如果答案不是这台设备点的（群聊里别人先答，或一对一时同一用户在另一台设备上先答），照实显示服务端记录的那个答案。用户在确认卡上点“取消”也在这里，显示“你已取消”。默认组件：已回答的选择题**只保留答案**——选中的选项各显示为一个带 ✓ 的答案胶囊，其余选项不再显示；文字回答（`freeText`，任何交互块）显示为卡片里的一个带 ✓ 的答案胶囊（可多行换行、常规字重），不再显示“你的回答：……”一行，块自己的控件也不再显示；颜色与字体取主题的 `answerBackground` / `answerForeground` / `answer`，读屏读作“已回答：北京” / “你的回答：……” | 禁用（答案胶囊不可点） |
 | `expired` / `cancelled` / `superseded` | “已过期” / “已作废” + `reason.text`（没有时按 `reason.code` 给默认文案，如“相关记录已被删除”；`stopped` 无说明时为“已停止，没有等到回答”；有 `reason.text` 时如实显示该说明，不附加“没有等到回答”）/ “已被新的请求取代”；措辞要和用户自己点的“取消”区分开 | 禁用 |
 | 没有 `ActionTransport`、会话只读，或宿主判定当前查看者不能回答 | 内容与状态照常显示，附一行简短说明（例如“仅可查看”） | 禁用；**不会**改为把选项文字作为消息发出 |
 
@@ -174,7 +174,7 @@ final registry = BlockRegistry.withDefaults()          // 内置 12 种类型的
 运行中途要用户确认或回答时，消息暂停（[protocol.md 4.8](protocol.md#48-中断暂停与继续同一条消息)）。界面上它仍是**同一条消息**：
 
 - **暂停中**：已出现的文字和组件照常显示；问题所在的交互块可操作；没有生成中的光标和临时提示，也不显示“连接中断”；过程条保持展开，那一行“等你确认 / 等你回答”。停止按钮可用；点按后显示“正在停止…”并禁用重复点按，继续接收实时连接直到 message.end，兜底刷新持续退避直到最终 rev 到达（停止后卡片优先显示服务端 `state.reason.text`；无说明时显示“已停止，没有等到回答”）。
-- **回答**：交互块照常“提交中 → 服务端结果”（4.2，不乐观显示）。回答显示在**卡片上**（选中的选项打勾、“已确认”、文字回答显示为卡片里的一行“你的回答：……”），**不**在对话里多出一条用户气泡。
+- **回答**：交互块照常“提交中 → 服务端结果”（4.2，不乐观显示）。回答显示在**卡片上**（选中的选项打勾、“已确认”、文字回答显示为卡片里一个带 ✓ 的答案胶囊），**不**在对话里多出一条用户气泡。
 - **继续**：收到继续之后的事件，新内容接在这条消息下面出现（不是新的一条消息），过程条那一行回到运行中；滚动规则与生成中相同（用户在底部时跟随）。
 - **输入框**：有一个暂停中的中断、当前查看者可以回答时，输入框**锁定**；用户点卡片上的“输入其他内容”后输入框解锁并挂上“回答：<问题>”标签，发出的文字是这张卡的回答（经 `ActionTransport`），不是新消息。完整契约见 4.5。
 - **通知**：暂停时宿主可以发一条“需要你确认”的通知，文字取 `message.paused.fallbackText`；库只提供回调，不发通知。
@@ -199,7 +199,7 @@ final registry = BlockRegistry.withDefaults()          // 内置 12 种类型的
 - `locked → answering`：`beginOtherInput()`；`otherInput: false` 时卡上没有入口，调用无效。
 - `answering → locked`：点标签上的 ✕（`cancelOtherInput()`），已经打的字保留，下次进入 `answering` 时还在。
 - `answering → submitting`：`submitOtherInput(text)`：生成 `{freeText}` 动作（动作 ID 规则同 [protocol.md 5.1](protocol.md#51-三个对象)，重发复用同一个 ID），经 `ActionTransport` 提交。文字为空或超过 500 字符时不提交。
-- `submitting →`：`accepted`（带 `resume`）→ `free`，清空草稿；服务端明确拒绝且块仍 `open`（`invalid_payload`、`conflict` 等）→ 回到 `answering`，文字放回输入框，标签下显示服务端的 `message`；`unavailable` 或超时 → 保持 `submitting`，刷新块状态、用同一个 ID 重试。
+- `submitting →`：`accepted`（带 `resume`）→ `free`，清空草稿；只要答案已被接受或已在途（已排队、`accepted` 但服务端没有要求 `resume`、刷新后发现块已关闭、仍在确认中），`submitOtherInput` 返回时也清空草稿——文字已经是这次回答，不再留在输入框里；只有服务端明确拒绝（`rejected`）、需要手动重试（`retryable`）或根本没有提交（`idle`）时文字保留；服务端明确拒绝且块仍 `open`（`invalid_payload`、`conflict` 等）→ 回到 `answering`，文字放回输入框，标签下显示服务端的 `message`；`unavailable` 或超时 → 保持 `submitting`，刷新块状态、用同一个 ID 重试。
 - **中断在别处被关闭**（另一台设备已回答、过期、停止、块变成 `cancelled` / `superseded`）：任何状态 → `free`，控制器给出 `closedReason`（`answered_elsewhere` / `expired` / `stopped` / `withdrawn`）；草稿留在输入框里变回普通草稿，宿主据此提示一句，免得用户把它当成回答发出去。
 - 消息继续（`message.resumed`）后按生成中的普通规则处理。最终回答里带着问题（消息已经结束）**不**进入 `locked`。
 
@@ -256,6 +256,9 @@ class ChatWeaveThemeData {
   final ChatWeaveIcons icons;             // 状态图标、箭头、展开等，宿主可替换成自己的图标
   final BlockFrameBuilder? blockFrame;    // 可选：给每个组件块套统一的外框（例如宿主的“纸片”卡片）
   final MessageFrameBuilder? messageFrame;// 可选：助手消息 / 用户消息的外框
+  final Color answerBackground;           // 已回答卡片里答案胶囊的底色（默认中性灰：浅色 #EDEFF2，深色 #2A3038）
+  final Color answerForeground;           // 答案胶囊的文字与 ✓（默认：浅色 #17191C，深色 #F2F3F5）
+  final TextStyle answer;                 // 答案胶囊的文字样式（默认常规字重 16/1.5，可换行）
 }
 ```
 
