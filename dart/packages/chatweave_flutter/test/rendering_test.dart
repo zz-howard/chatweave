@@ -425,7 +425,7 @@ void main() {
         'title': '新建待办',
         'fields': [
           {'key': 'title', 'label': '事项', 'type': 'text'},
-          {'key': 'note', 'label': '备注', 'type': 'text'},
+          {'key': 'note', 'label': '优先级', 'type': 'text'},
         ],
         'action': {'type': 'form.submit', 'target': 'todo.create'},
         'state': {'status': 'open'},
