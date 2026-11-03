@@ -276,4 +276,76 @@ void main() {
     await tester.pumpWidget(app(const SizedBox()));
     await store.dispose();
   });
+  testWidgets('user_drag_wins_over_stream_updates', (tester) async {
+    // Steps and text of the newest reply keep changing while the user drags
+    // the list. Every update used to end the drag with a jumpTo (follow, then
+    // anchor correction), so the list did not move under the finger.
+    final store = BlockStore();
+    for (var i = 0; i < 30; i++) {
+      store.apply(SyncMessage(message('m$i', text: '天气 $i\n' * 5)));
+    }
+    var tick = 0;
+    void stream() {
+      tick++;
+      store.apply(SyncMessage(message('live',
+          text: '回答 $tick\n' * (1 + tick ~/ 3),
+          blockStatus: 'pending',
+          steps: [
+            for (var i = 0; i <= tick ~/ 4; i++)
+              {'id': 's$i', 'label': '读取天气 $i', 'state': 'running'},
+          ])));
+    }
+
+    stream();
+    await tester.pumpWidget(app(ChatWeaveList(
+        store: store,
+        registry: BlockRegistry.withDefaults(),
+        conversationId: 'c')));
+    await tester.pump();
+    final position =
+        tester.state<ScrollableState>(find.byType(Scrollable).first).position;
+    expect(position.pixels, 0);
+
+    Future<void> dragWhileStreaming(double dy, int moves) async {
+      final gesture = await tester
+          .startGesture(tester.getCenter(find.byType(CustomScrollView)));
+      for (var i = 0; i < moves; i++) {
+        await gesture.moveBy(Offset(0, dy));
+        stream();
+        await tester.pump(const Duration(milliseconds: 16));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await gesture.up();
+      await tester.pump();
+    }
+
+    // From the bottom (following): the drag moves the list up.
+    await dragWhileStreaming(30, 12);
+    await tester.pumpAndSettle();
+    final away = position.pixels;
+    expect(away, greaterThan(250));
+    // Off the bottom, more updates do not pull the list back.
+    stream();
+    await tester.pump();
+    await tester.pump();
+    expect(position.pixels, greaterThan(250));
+    // Dragging further up and back down both move the list.
+    await dragWhileStreaming(30, 8);
+    await tester.pumpAndSettle();
+    final higher = position.pixels;
+    expect(higher, greaterThan(away + 150));
+    await dragWhileStreaming(-30, 6);
+    await tester.pumpAndSettle();
+    expect(position.pixels, lessThan(higher - 100));
+    // Back at the bottom, the list follows the reply again.
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -5000));
+    await tester.pumpAndSettle();
+    expect(position.pixels, 0);
+    stream();
+    await tester.pump();
+    await tester.pump();
+    expect(position.pixels, 0);
+    await tester.pumpWidget(app(const SizedBox()));
+    await store.dispose();
+  });
 }
