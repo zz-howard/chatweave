@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:chatweave_flutter/chatweave_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 List<StreamEvent> events() => File(
@@ -12,6 +13,150 @@ List<StreamEvent> events() => File(
         .toList();
 
 void main() {
+  testWidgets(
+    'long_press_selects_markdown_but_not_choice_text',
+    (tester) async {
+      String? clipboard;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          clipboard =
+              (call.arguments as Map<Object?, Object?>)['text'] as String?;
+        }
+        return null;
+      });
+      final choice = Block.fromJson({
+        'id': 'choice',
+        'type': 'choice',
+        'schemaVersion': 1,
+        'fallbackText': 'Choose a city',
+        'data': {
+          'prompt': 'Choose a city',
+          'options': [
+            {'id': 'one', 'label': 'Choice button'},
+            {'id': 'two', 'label': 'Other button'},
+          ],
+          'action': {'type': 'choice.select', 'target': 'city.select'},
+          'state': {'status': 'open'},
+        },
+      });
+      final selectable = Message.fromJson({
+        'id': 'selection',
+        'conversationId': 'c',
+        'role': 'assistant',
+        'createdAt': '2026-10-26T09:30:00Z',
+        'status': 'complete',
+        'rev': 1,
+        'fallbackText': 'selectable word',
+        'blocks': [
+          {
+            'id': 'body',
+            'type': 'markdown',
+            'schemaVersion': 1,
+            'fallbackText': 'selectable word',
+            'data': {'text': 'selectable word'},
+          },
+          choice.json,
+        ],
+      });
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: MessageView(
+            message: selectable,
+            registry: BlockRegistry.withDefaults(),
+            processState: ProcessState(),
+          ),
+        ),
+      ));
+
+      await tester.longPress(find.text('selectable word'));
+      await tester.pump();
+      final area = tester.state<SelectionAreaState>(find.byType(SelectionArea));
+      final copy = area.selectableRegion.contextMenuButtonItems.singleWhere(
+        (item) => item.type == ContextMenuButtonType.copy,
+      );
+      copy.onPressed!();
+      await tester.pump();
+      expect(clipboard, contains('selectable'));
+
+      await tester.pumpWidget(const SizedBox());
+      final choiceOnly = Message.fromJson({
+        ...selectable.json,
+        'id': 'choice-only',
+        'blocks': [choice.json],
+      });
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: MessageView(
+            message: choiceOnly,
+            registry: BlockRegistry.withDefaults(),
+            processState: ProcessState(),
+          ),
+        ),
+      ));
+      clipboard = null;
+      await tester.longPress(find.text('Choice button'));
+      await tester.pump();
+      final choiceArea =
+          tester.state<SelectionAreaState>(find.byType(SelectionArea));
+      expect(
+        choiceArea.selectableRegion.contextMenuButtonItems
+            .where((item) => item.type == ContextMenuButtonType.copy),
+        isEmpty,
+      );
+      expect(clipboard, isNull);
+    },
+  );
+
+  testWidgets('default_copy_uses_whole_message_plain_text', (tester) async {
+    String? clipboard;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        clipboard =
+            (call.arguments as Map<Object?, Object?>)['text'] as String?;
+      }
+      return null;
+    });
+    final message = Message.fromJson({
+      'id': 'copy',
+      'conversationId': 'c',
+      'role': 'assistant',
+      'createdAt': '2026-10-26T09:30:00Z',
+      'status': 'complete',
+      'rev': 1,
+      'fallbackText': 'fallback',
+      'blocks': [
+        {
+          'id': 'body',
+          'type': 'markdown',
+          'schemaVersion': 1,
+          'fallbackText': 'ignored',
+          'data': {'text': '- **first**\n- second'},
+        },
+        {
+          'id': 'extra',
+          'type': 'x-test.extra',
+          'schemaVersion': 1,
+          'fallbackText': 'component fallback',
+          'data': <String, Object?>{},
+        },
+      ],
+    });
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: MessageView(
+          message: message,
+          registry: BlockRegistry.withDefaults(),
+          processState: ProcessState(),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('复制'));
+    await tester.pump();
+    expect(clipboard, '\u2022 first\n\u2022 second\n\ncomponent fallback');
+  });
+
   testWidgets('component_fill_preserves_text_top_left', (tester) async {
     final store = BlockStore();
     final stream = events();

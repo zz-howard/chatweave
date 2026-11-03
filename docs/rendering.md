@@ -94,13 +94,13 @@ final registry = BlockRegistry.withDefaults()          // 内置 12 种类型的
 - 普通段落在稳定边界封存；活动尾部按几何增长阈值重解析，间隔内追加文本原样显示，块结束时完整解析尾部。列表跨段与引用定义回退为整体解析，并同样按几何阈值批处理，完成时保证列表与引用解析正确（[streaming.md 第 7 节](streaming.md#7-布局稳定避免界面跳动)）。
 - 文本可选择、可复制；复制时得到原始 Markdown 去除标记后的纯文本。
 - 代码块与行内代码里的内容一律原样显示，不解释其中的任何语法或链接。
-- 库提供 `plainTextSummary(message, maxChars)`：去掉 Markdown 标记、组件块用 `fallbackText`，供宿主做通知、会话列表预览、搜索摘要，保证各处的“纯文本版本”一致。
+- 库提供 `messagePlainText(message, blockText: ...)` 生成复制用纯文本（组件块默认用 `fallbackText`，宿主可用 `blockText` 覆盖），`plainTextSummary(message, maxChars)` 则将同一结果按 Unicode 字符截断，供通知、会话列表预览与搜索摘要使用。
 
 ## 4. 降级规则（客户端实现）
 
 存储恢复、message.snapshot、SyncMessage 与动作补丁均按消费方宽进处理：保留坏块原始内容与 fallbackText，由注册表仅降级该块为纯文本或 FallbackNote，兄弟块正常显示；FoldState 默认不因单块结构或数据校验失败拒绝整条消息。manifest 一致性测试显式启用 strictBlocks 生产方严格模式；消息级字节预算、seq/rev 与事件顺序检查仍有效。
 
-正文默认使用 `Text` / `RichText`，不创建带 longPress 的只读输入控件；选择复制由宿主在列表外包 `SelectionArea`，或使用消息操作栏的“复制”。
+正文默认使用 `Text` / `RichText`，`MessageView` 在正文块外包 `SelectionArea`，长按可选择并使用平台复制工具栏；宿主自建消息视图时也可在列表外包 `SelectionArea`。交互块会禁用选择，消息操作栏的“复制”复制整轮正文。
 
 默认组件在自己的 build、流 builder 和布局 builder 内执行解析、格式化、取数据与布局参数计算，并在同一边界里捕获异常。默认组件及注册表 `parse` / `build` 内的异常均保证逐块降级；边界内同步布局 / 绘制异常同样降级，兄弟块继续显示。
 
