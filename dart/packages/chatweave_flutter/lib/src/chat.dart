@@ -465,11 +465,18 @@ class _ChatWeaveListState extends State<ChatWeaveList> {
   }
 
   /// The only place that mutates the scroll position.
-  void _writeScroll(double pixels) {
-    if (mounted && _scroll.hasClients)
-      _scroll.jumpTo(
-        pixels.clamp(0, _scroll.position.maxScrollExtent).toDouble(),
-      );
+  ///
+  /// A user drag always wins: while the list is moving under the user's
+  /// finger or a fling the user started (or any other scroll activity), the
+  /// automatic follow and anchor corrections are skipped. `jumpTo` would end
+  /// that activity, so a write on every stream event cancelled the drag
+  /// before it could move the list, and the list looked frozen. Only an
+  /// explicit request from the user ([force], e.g. "jump to latest") moves it.
+  void _writeScroll(double pixels, {bool force = false}) {
+    if (!mounted || !_scroll.hasClients) return;
+    final position = _scroll.position;
+    if (!force && position.isScrollingNotifier.value) return;
+    _scroll.jumpTo(pixels.clamp(0, position.maxScrollExtent).toDouble());
   }
 
   @override
@@ -494,6 +501,10 @@ class _ChatWeaveListState extends State<ChatWeaveList> {
       children: [
         NotificationListener<ScrollNotification>(
           onNotification: (notification) {
+            // Scrollables nested in a message (wide tables, code) bubble
+            // their notifications up here; only the list itself decides
+            // whether the user left the bottom.
+            if (notification.depth != 0) return false;
             if (notification is UserScrollNotification) {
               _viewport = ViewportController.reduce(
                 _viewport,
@@ -588,7 +599,7 @@ class _ChatWeaveListState extends State<ChatWeaveList> {
                 setState(() {
                   _viewport = const ViewportState();
                 });
-                _writeScroll(0);
+                _writeScroll(0, force: true);
               },
               child: Text(
                 '${cw(context, '有')} ${_viewport.newMessages} ${cw(context, '条新内容')}',
