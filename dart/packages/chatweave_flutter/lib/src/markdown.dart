@@ -379,14 +379,149 @@ class _MarkdownBlockViewState extends State<MarkdownBlockView>
 }
 
 String plainTextSummary(Message message, int maxChars) {
-  final text = message.blocks
-      .map(
-        (b) => b.type == 'markdown'
-            ? parseSafeMarkdown(b.data['text'] as String? ?? '')
-                .map((n) => n.textContent)
-                .join('\n')
-            : b['fallbackText'] as String? ?? '',
-      )
-      .join('\n');
+  final text = messagePlainText(message);
   return String.fromCharCodes(text.runes.take(maxChars < 0 ? 0 : maxChars));
+}
+
+/// Returns the readable plain-text form of a message's content blocks.
+///
+/// Markdown uses the same sanitized parse tree as [MarkdownBlockView]. Other
+/// block types use [blockText] when it returns a value, then `fallbackText`.
+String messagePlainText(
+  Message message, {
+  String? Function(Block block)? blockText,
+}) {
+  final blocks = <String>[];
+  for (final block in message.blocks) {
+    final raw = block.type == 'markdown'
+        ? _markdownPlainText(block.data['text'] as String? ?? '')
+        : blockText?.call(block) ??
+            (block['fallbackText'] is String
+                ? block['fallbackText']! as String
+                : '');
+    final text = _cleanPlainText(raw);
+    if (text.isNotEmpty) blocks.add(text);
+  }
+  return blocks.join('\n\n');
+}
+
+String _markdownPlainText(String source) {
+  final chunks = <String>[];
+  for (final node in parseSafeMarkdown(source)) {
+    chunks.addAll(_plainBlock(node));
+  }
+  return _cleanPlainText(chunks.where((s) => s.isNotEmpty).join('\n\n'));
+}
+
+List<String> _plainBlock(md.Node node) {
+  if (node is! md.Element) return [_plainInline(node)];
+  if (node.tag == 'ul' || node.tag == 'ol') return [_plainList(node, 0)];
+  if (node.tag == 'table') return [_plainTable(node)];
+  if (node.tag == 'blockquote') {
+    return [
+      for (final child in node.children ?? const <md.Node>[])
+        ..._plainBlock(child),
+    ];
+  }
+  if (node.tag == 'pre') return [node.textContent];
+  if (node.tag == 'p' || RegExp(r'^h[1-6]$').hasMatch(node.tag)) {
+    return [_plainInline(node)];
+  }
+  if (node.tag == 'hr') return const [];
+  return [_plainInline(node)];
+}
+
+String _plainInline(md.Node node) {
+  if (node is md.Text) return node.text;
+  if (node is! md.Element) return node.textContent;
+  if (node.tag == 'br') return '\n';
+  return (node.children ?? const <md.Node>[]).map(_plainInline).join();
+}
+
+String _plainList(md.Element list, int depth) {
+  final ordered = list.tag == 'ol';
+  final start = ordered ? int.tryParse(list.attributes['start'] ?? '') ?? 1 : 1;
+  final lines = <String>[];
+  final items = (list.children ?? const <md.Node>[])
+      .whereType<md.Element>()
+      .where((child) => child.tag == 'li')
+      .toList();
+  for (var index = 0; index < items.length; index++) {
+    final item = items[index];
+    final children = item.children ?? const <md.Node>[];
+    final nested = children
+        .whereType<md.Element>()
+        .where((child) => child.tag == 'ul' || child.tag == 'ol');
+    final own = _cleanPlainText(
+      children
+          .where((child) =>
+              child is! md.Element || (child.tag != 'ul' && child.tag != 'ol'))
+          .map(_plainInline)
+          .join('\n'),
+    );
+    final prefix = ordered ? '${start + index}. ' : '• ';
+    final indent = '  ' * depth;
+    if (own.isNotEmpty) {
+      final ownLines = own.split('\n');
+      lines.add('$indent$prefix${ownLines.first}');
+      lines.addAll(ownLines.skip(1).map((line) => '$indent  $line'));
+    }
+    for (final child in nested) {
+      final text = _plainList(child, depth + 1);
+      if (text.isNotEmpty) lines.add(text);
+    }
+  }
+  return lines.join('\n');
+}
+
+String _plainTable(md.Element table) {
+  final rows = <String>[];
+  void visit(md.Node node) {
+    if (node is! md.Element) return;
+    if (node.tag == 'tr') {
+      final cells = (node.children ?? const <md.Node>[])
+          .whereType<md.Element>()
+          .where((child) => child.tag == 'th' || child.tag == 'td')
+          .map(
+            (cell) => _cleanPlainText(_plainInline(cell)).replaceAll('\n', ' '),
+          )
+          .toList();
+      if (cells.isNotEmpty) rows.add(cells.join(' | '));
+      return;
+    }
+    for (final child in node.children ?? const <md.Node>[]) {
+      visit(child);
+    }
+  }
+
+  visit(table);
+  return rows.join('\n');
+}
+
+String _cleanPlainText(String text) {
+  final lines = text
+      .replaceAll('\r\n', '\n')
+      .replaceAll('\r', '\n')
+      .trim()
+      .split('\n')
+      .map((line) => line.replaceFirst(RegExp(r'[ \t]+$'), ''))
+      .toList();
+  while (lines.isNotEmpty && lines.first.trim().isEmpty) {
+    lines.removeAt(0);
+  }
+  while (lines.isNotEmpty && lines.last.trim().isEmpty) {
+    lines.removeLast();
+  }
+  final result = <String>[];
+  var blank = false;
+  for (final line in lines) {
+    if (line.trim().isEmpty) {
+      if (!blank) result.add('');
+      blank = true;
+    } else {
+      result.add(line);
+      blank = false;
+    }
+  }
+  return result.join('\n');
 }

@@ -10,6 +10,8 @@ import 'theme.dart';
 typedef BlockWidgetBuilder = Widget Function(BuildContext, Block);
 typedef BlockRenderError = void Function(Block, Object);
 
+const _interactionBlockTypes = {'choice', 'confirmation', 'form_intent'};
+
 class BlockRegistration {
   const BlockRegistration(
       {required this.build,
@@ -97,19 +99,24 @@ class BlockRegistry {
         'locale': locale
       });
   Widget render(Block block,
-          {InteractionController? interactions,
-          String? messageId,
-          InterruptComposerController? composer,
-          bool readOnly = false}) =>
-      InteractionScope(
-          interactions: interactions,
-          messageId: messageId,
-          composer: composer,
-          readOnly: readOnly,
-          child: _BlockBoundary(
-              key: ValueKey('${block.id}/${block.type}'),
-              registry: this,
-              block: block));
+      {InteractionController? interactions,
+      String? messageId,
+      InterruptComposerController? composer,
+      bool readOnly = false}) {
+    final boundary = _BlockBoundary(
+        key: ValueKey('${block.id}/${block.type}'),
+        registry: this,
+        block: block);
+    // Buttons, inputs and ask cards never join a host's text selection.
+    return InteractionScope(
+        interactions: interactions,
+        messageId: messageId,
+        composer: composer,
+        readOnly: readOnly,
+        child: _interactionBlockTypes.contains(block.type)
+            ? SelectionContainer.disabled(child: boundary)
+            : boundary);
+  }
 
   Widget build(BuildContext context, Block block,
       [Set<String> visited = const {}]) {

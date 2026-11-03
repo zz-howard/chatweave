@@ -287,20 +287,27 @@ class MessageView extends StatelessWidget {
             onBeforeResize: onProcessResize,
             onManualResize: onManualProcessResize,
           ),
-        for (final block in message.blocks)
-          KeyedSubtree(
-            key: blockKeys?[block.id] ?? ValueKey(block.id),
-            child: Semantics(
-              liveRegion: false,
-              child: registry.render(
-                block,
-                interactions: interactions,
-                messageId: message.id,
-                composer: composer,
-                readOnly: readOnly,
-              ),
-            ),
+        SelectionArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final block in message.blocks)
+                KeyedSubtree(
+                  key: blockKeys?[block.id] ?? ValueKey(block.id),
+                  child: Semantics(
+                    liveRegion: false,
+                    child: registry.render(
+                      block,
+                      interactions: interactions,
+                      messageId: message.id,
+                      composer: composer,
+                      readOnly: readOnly,
+                    ),
+                  ),
+                ),
+            ],
           ),
+        ),
         if (message.status == 'streaming' &&
             activity != null &&
             !message.steps.any((s) => s['state'] == 'running'))
@@ -320,7 +327,7 @@ class MessageView extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: ChatWeaveTextButton(
                   onPressed: () => Clipboard.setData(
-                    ClipboardData(text: plainTextSummary(message, 16000)),
+                    ClipboardData(text: messagePlainText(message)),
                   ),
                   child: const DefaultLabel('复制'),
                 ),

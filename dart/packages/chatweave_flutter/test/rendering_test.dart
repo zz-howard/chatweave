@@ -14,6 +14,96 @@ Block block(String type, {String id = 'b'}) => Block.fromJson({
 Widget app(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 void main() {
+  group('messagePlainText', () {
+    Message messageWith(List<Json> blocks, {List<Json> steps = const []}) =>
+        Message.fromJson({
+          'id': 'plain',
+          'conversationId': 'c',
+          'role': 'assistant',
+          'createdAt': '2026-10-26T09:30:00Z',
+          'status': 'complete',
+          'rev': 1,
+          'fallbackText': 'message fallback',
+          'blocks': blocks,
+          'steps': steps,
+        });
+    Json markdown(String text, [String id = 'markdown']) => {
+          'id': id,
+          'type': 'markdown',
+          'schemaVersion': 1,
+          'fallbackText': text,
+          'data': {'text': text},
+        };
+
+    test('preserves_list_markers_start_numbers_and_nested_indentation', () {
+      final message = messageWith([
+        markdown('- outer\n  - inner\n\n3. third\n4. fourth'),
+      ]);
+      expect(
+        messagePlainText(message),
+        '• outer\n  • inner\n\n3. third\n4. fourth',
+      );
+    });
+
+    test('formats_markdown_blocks_without_markup', () {
+      final message = messageWith([
+        markdown('# Heading\n\nFirst *strong* [site](https://example.com) '
+            'and `raw <code>`.  \nNext\n\n'
+            '| Name | Value |\n| --- | --- |\n| One | **Two** |'),
+      ]);
+      expect(
+        messagePlainText(message),
+        'Heading\n\nFirst strong site and raw <code>.\nNext\n\n'
+        'Name | Value\nOne | Two',
+      );
+    });
+
+    test('uses_fallback_hook_and_skips_empty_blocks_and_steps', () {
+      final message = messageWith([
+        markdown('Paragraph'),
+        {
+          'id': 'component',
+          'type': 'metric',
+          'schemaVersion': 1,
+          'fallbackText': '  metric fallback  ',
+          'data': {'label': 'Temperature', 'value': 18},
+        },
+        {
+          'id': 'custom',
+          'type': 'x-test.custom',
+          'schemaVersion': 1,
+          'fallbackText': 'custom fallback',
+          'data': <String, Object?>{},
+        },
+        {
+          'id': 'empty',
+          'type': 'x-test.empty',
+          'schemaVersion': 1,
+          'fallbackText': '   ',
+          'data': <String, Object?>{},
+        },
+      ], steps: [
+        {'id': 'step', 'label': 'must stay absent', 'state': 'succeeded'},
+      ]);
+      expect(
+        messagePlainText(
+          message,
+          blockText: (block) =>
+              block.type == 'x-test.custom' ? 'hook override' : null,
+        ),
+        'Paragraph\n\nmetric fallback\n\nhook override',
+      );
+      expect(messagePlainText(message), contains('custom fallback'));
+      expect(messagePlainText(message), isNot(contains('must stay absent')));
+    });
+
+    test('plainTextSummary_truncates_messagePlainText_by_runes', () {
+      final message = messageWith([markdown('A😀BC')]);
+      expect(plainTextSummary(message, 3), 'A😀B');
+      expect(plainTextSummary(message, -1), '');
+    });
+  });
+
   testWidgets('consumer_bad_blocks_degrade_without_losing_siblings',
       (tester) async {
     final store = BlockStore();
@@ -198,6 +288,35 @@ void main() {
         .map((w) => w.text.toPlainText())
         .join();
     expect(text, contains('第一行\n第二行'));
+  });
+  testWidgets('message_selection_keeps_link_taps_working', (tester) async {
+    final message = Message.fromJson({
+      'id': 'link',
+      'conversationId': 'c',
+      'role': 'assistant',
+      'createdAt': '2026-10-26T09:30:00Z',
+      'status': 'complete',
+      'rev': 1,
+      'fallbackText': 'site',
+      'blocks': [
+        {
+          'id': 'body',
+          'type': 'markdown',
+          'schemaVersion': 1,
+          'fallbackText': 'site',
+          'data': {'text': '[site](https://example.com)'},
+        },
+      ],
+    });
+    await tester.pumpWidget(app(MessageView(
+      message: message,
+      registry: BlockRegistry.withDefaults(),
+      processState: ProcessState(),
+    )));
+    await tester.tap(find.text('site'));
+    await tester.pumpAndSettle();
+    expect(find.text('打开链接'), findsOneWidget);
+    expect(find.text('https://example.com'), findsOneWidget);
   });
   test('markdown_delta_reparses_tail_only', () {
     final document = IncrementalDocument()..update('稳定段落\n\n活动');
