@@ -924,7 +924,29 @@ impl MessageStream {
             .terminate("cancelled", "Stopped", "cancelled")
             .await
     }
+    /// Ends the message as failed with error code `upstream_failed`. Same
+    /// as [`MessageStream::fail_with`] with that code.
     pub async fn fail(&self, description: &str) -> Result<Message> {
+        self.fail_with("upstream_failed", description).await
+    }
+
+    /// Ends the message as failed and reports `code` as the cause in the
+    /// `message.end` error. The status is `interrupted` when the message
+    /// already shows content, otherwise `error`.
+    ///
+    /// `code` must be one of [`crate::protocol::STREAM_ERROR_CODES`] (the
+    /// schema's closed enum), except `cancelled` and `interrupt_expired`,
+    /// which only [`MessageStream::stop`] and
+    /// [`MessageStream::expire_interrupt`] write. Any other code returns
+    /// [`Error::InvalidRequest`] and leaves the stream untouched.
+    pub async fn fail_with(&self, code: &str, description: &str) -> Result<Message> {
+        if !crate::protocol::STREAM_ERROR_CODES.contains(&code)
+            || matches!(code, "cancelled" | "interrupt_expired")
+        {
+            return Err(Error::InvalidRequest(format!(
+                "unsupported failure code: {code}"
+            )));
+        }
         let mut inner = self.inner.lock().await;
         if inner.message()?.status() == "paused" {
             return Err(Error::Conflict);
@@ -933,7 +955,7 @@ impl MessageStream {
             || inner.pending.values().any(|text| !text.is_empty());
         inner
             .terminate_with_status(
-                "upstream_failed",
+                code,
                 description,
                 "failed",
                 if has_content { "interrupted" } else { "error" },

@@ -108,6 +108,7 @@ class ChatWeaveLocalizations extends InheritedWidget {
     '你的回答：': 'Your answer: ',
     '已回答：': 'Answered: ',
     '已提交：': 'Submitted: ',
+    '已提交': 'Submitted',
     '已作废 · ': 'Withdrawn · ',
   };
   @override

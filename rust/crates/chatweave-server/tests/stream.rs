@@ -492,6 +492,49 @@ async fn an_upstream_failure_without_content_ends_with_an_explanatory_error_mess
 }
 
 #[tokio::test]
+async fn fail_with_reports_the_producer_code_in_message_end() {
+    let (stream, log, _, _) = setup("msg_fail_with").await;
+    let message = stream
+        .fail_with("internal", "Another run is active")
+        .await
+        .unwrap();
+    assert_eq!(message.status(), "error");
+    let events = log.read_after("msg_fail_with", 0).await.unwrap().events;
+    let end = events.last().unwrap();
+    assert_eq!(end.event_type(), "message.end");
+    assert_eq!(end.0["error"]["code"], "internal");
+    assert_eq!(end.0["error"]["message"], "Another run is active");
+}
+
+#[tokio::test]
+async fn fail_keeps_upstream_failed_as_its_code() {
+    let (stream, log, _, _) = setup("msg_fail_default").await;
+    let text = stream.start_block("markdown", 1, "").await.unwrap();
+    text.append_text("Partial").await.unwrap();
+    text.finish().await.unwrap();
+    let message = stream.fail("Model unavailable").await.unwrap();
+    assert_eq!(message.status(), "interrupted");
+    let events = log.read_after("msg_fail_default", 0).await.unwrap().events;
+    assert_eq!(events.last().unwrap().0["error"]["code"], "upstream_failed");
+}
+
+#[tokio::test]
+async fn fail_with_rejects_codes_outside_the_protocol_and_keeps_streaming() {
+    let (stream, log, _, _) = setup("msg_fail_bad_code").await;
+    for code in ["runtime_conflict", "cancelled", "interrupt_expired", ""] {
+        assert!(matches!(
+            stream.fail_with(code, "Nope").await,
+            Err(chatweave_server::Error::InvalidRequest(_))
+        ));
+    }
+    assert!(!stream.cancellation().is_cancelled());
+    let events = log.read_after("msg_fail_bad_code", 0).await.unwrap().events;
+    assert!(!events.iter().any(|event| event.is_terminal()));
+    let message = stream.fail_with("upstream_failed", "Down").await.unwrap();
+    assert_eq!(message.status(), "error");
+}
+
+#[tokio::test]
 async fn failed_markdown_flushes_buffered_text_before_closing_its_block() {
     let (stream, _, _, _) = setup("msg_failed_text").await;
     let block = stream.start_block("markdown", 1, "").await.unwrap();

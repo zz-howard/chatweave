@@ -583,6 +583,198 @@ void main() {
     }
     expect(ChatWeaveThemeData.neutralLight().fieldGap, 12);
   });
+  Block form(Json state, {String? title, List<Json>? fields}) =>
+      Block.fromJson({
+        'id': 'fv',
+        'type': 'form_intent',
+        'schemaVersion': 1,
+        'fallbackText': '等待回答',
+        'data': {
+          if (title != null) 'title': title,
+          'fields': fields ??
+              [
+                {'key': 'title', 'label': '事项', 'type': 'text'},
+                {'key': 'priority', 'label': '优先级', 'type': 'integer'},
+                {'key': 'done', 'label': '完成', 'type': 'boolean'},
+                {
+                  'key': 'city',
+                  'label': '城市',
+                  'type': 'single_select',
+                  'options': [
+                    {'id': 'bj', 'label': '北京'},
+                    {'id': 'sh', 'label': '上海'},
+                  ],
+                },
+                {
+                  'key': 'cities',
+                  'label': '城市',
+                  'type': 'multi_select',
+                  'options': [
+                    {'id': 'bj', 'label': '北京'},
+                    {'id': 'sh', 'label': '上海'},
+                  ],
+                },
+                {'key': 'note', 'label': '其他', 'type': 'text'},
+              ],
+          'action': {'type': 'form.submit', 'target': 'todo.create'},
+          'state': state,
+        },
+      });
+  Json resolvedWith(Json values) => {
+        'status': 'resolved',
+        'resolvedAt': '2026-10-26T09:31:00Z',
+        'resolvedBy': 'member_7',
+        'values': values,
+      };
+
+  test('form_answers_read_like_the_fields', () {
+    final b = form(resolvedWith({
+      'title': '浇花',
+      'priority': 2.0,
+      'done': true,
+      'city': 'sh',
+      'cities': ['bj', 'sh'],
+      'note': '  ',
+      'unknown': 'x',
+    }));
+    validateBlock(b.json);
+    expect(formAnswerLabels(b, formAnswers(b)!), [
+      '事项：浇花',
+      '优先级：2',
+      '完成：是',
+      '城市：上海',
+      '城市：北京、上海',
+    ]);
+    expect(interactionSummary(b), '已提交：事项：浇花；优先级：2；完成：是；城市：上海；城市：北京、上海');
+    expect(formAnswers(form({'status': 'open'})), isNull);
+    expect(
+      formAnswers(form({
+        'status': 'resolved',
+        'resolvedAt': '2026-10-26T09:31:00Z',
+        'freeText': '先保留这条待办',
+      })),
+      isNull,
+    );
+    expect(formAnswers(form(resolvedWith({}))), isEmpty);
+    expect(interactionSummary(form(resolvedWith({}))), '已提交');
+  });
+
+  testWidgets('form_resolved_with_values_shows_read_only_answers',
+      (tester) async {
+    final semantics = tester.ensureSemantics();
+    final b = form(
+      resolvedWith({'title': '浇花', 'priority': 2}),
+      title: '新建待办',
+    );
+    validateBlock(b.json);
+    await tester.pumpWidget(app(BuiltinBlockView(block: b)));
+    expect(find.text('新建待办'), findsOneWidget);
+    expect(find.byType(TextFormField), findsNothing);
+    expect(find.byType(CheckboxListTile), findsNothing);
+    expect(find.byType(ChatWeaveTextButton), findsNothing);
+    expect(find.byType(AnswerCapsule), findsNWidgets(2));
+    expect(
+      find.byKey(const ValueKey('chatweave-answer-field-title')),
+      findsOneWidget,
+    );
+    expect(find.text('事项：浇花'), findsOneWidget);
+    expect(find.text('优先级：2'), findsOneWidget);
+    expect(find.bySemanticsLabel('已回答：事项：浇花'), findsOneWidget);
+    // The answer replaces the summary line, like an answered choice.
+    expect(find.textContaining('已提交'), findsNothing);
+    expect(find.text('等待回答'), findsNothing);
+    expect(find.text('回答者：member_7'), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('single_field_form_answer_shows_only_the_value', (tester) async {
+    final b = form(
+      resolvedWith({'title': '先保留这条待办'}),
+      fields: [
+        {'key': 'title', 'label': '事项', 'type': 'multiline_text'},
+      ],
+    );
+    validateBlock(b.json);
+    await tester.pumpWidget(app(BuiltinBlockView(block: b)));
+    expect(find.byType(AnswerCapsule), findsOneWidget);
+    expect(find.text('先保留这条待办'), findsOneWidget);
+    expect(find.textContaining('事项'), findsNothing);
+    expect(find.byType(TextFormField), findsNothing);
+  });
+
+  testWidgets('form_resolved_with_only_empty_values_shows_the_summary',
+      (tester) async {
+    final b = form(resolvedWith({'note': ''}), title: '新建待办');
+    validateBlock(b.json);
+    await tester.pumpWidget(app(BuiltinBlockView(block: b)));
+    expect(find.byType(AnswerCapsule), findsNothing);
+    expect(find.byType(TextFormField), findsNothing);
+    expect(find.text('已提交'), findsOneWidget);
+  });
+
+  testWidgets('untitled_form_has_no_empty_title_row', (tester) async {
+    final b = form({
+      'status': 'open'
+    }, fields: [
+      {'key': 'title', 'label': '事项', 'type': 'text'},
+    ]);
+    validateBlock(b.json);
+    await tester.pumpWidget(app(Align(
+      alignment: Alignment.topLeft,
+      child: BuiltinBlockView(block: b),
+    )));
+    final texts = tester.widgetList<Text>(find.descendant(
+      of: find.byType(InteractionBlockView),
+      matching: find.byType(Text),
+    ));
+    expect(texts.where((t) => (t.data ?? '').trim().isEmpty), isEmpty);
+    // The first line is the read-only note, right at the top inset.
+    expect(tester.getRect(find.text('仅可查看')).top, 12);
+    for (final title in ['', '  ']) {
+      await tester.pumpWidget(app(BuiltinBlockView(
+        key: ValueKey(title),
+        block: form({'status': 'open'}, title: title),
+      )));
+      expect(
+        tester
+            .widgetList<Text>(find.byType(Text))
+            .where((t) => t.data != null && t.data!.trim().isEmpty),
+        isEmpty,
+      );
+    }
+  });
+
+  testWidgets('show_resolver_false_hides_who_and_when', (tester) async {
+    final b = form(resolvedWith({'title': '浇花'}), title: '新建待办');
+    final base = ChatWeaveThemeData.neutralLight();
+    expect(base.showResolver, isTrue);
+    for (final show in [true, false]) {
+      await tester.pumpWidget(app(ChatWeaveTheme(
+        data: ChatWeaveThemeData(
+          brightness: base.brightness,
+          surface: base.surface,
+          onSurface: base.onSurface,
+          muted: base.muted,
+          outline: base.outline,
+          accent: base.accent,
+          onAccent: base.onAccent,
+          warning: base.warning,
+          critical: base.critical,
+          chartPalette: base.chartPalette,
+          showResolver: show,
+        ),
+        child: BuiltinBlockView(key: ValueKey(show), block: b),
+      )));
+      expect(find.text('回答者：member_7'), show ? findsOneWidget : findsNothing);
+      expect(
+        find.text('2026-10-26T09:31:00Z'),
+        show ? findsOneWidget : findsNothing,
+      );
+      // The block stays valid, so the summary is the real one.
+      expect(interactionSummary(b), '已提交：事项：浇花');
+    }
+  });
+
   testWidgets('interaction_padding_is_a_theme_token', (tester) async {
     final b = Block.fromJson({
       'id': 'f2',

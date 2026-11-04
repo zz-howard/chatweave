@@ -211,3 +211,18 @@ fn storage_checkpoints_can_be_larger_than_transport_snapshot_events() {
     assert!(restored.message().unwrap().0.get("lastSeq").is_none());
     assert!(FoldState::from_checkpoint(message, 3).is_err());
 }
+
+#[test]
+fn stream_error_codes_match_the_schema_enum() {
+    let schema: Value = serde_json::from_str(include_str!(
+        "../../../../schemas/v0.1/stream-event.schema.json"
+    ))
+    .unwrap();
+    let codes: Vec<&str> = schema["$defs"]["error"]["properties"]["code"]["enum"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|code| code.as_str().unwrap())
+        .collect();
+    assert_eq!(codes, chatweave_protocol::STREAM_ERROR_CODES);
+}

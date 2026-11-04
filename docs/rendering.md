@@ -66,7 +66,7 @@ final registry = BlockRegistry.withDefaults()          // 内置 12 种类型的
 | `status` | `StatusView` | 状态图标 + 文字；有 `progress` 显示进度条；有 `steps` 显示步骤列表 |
 | `choice` | `ChoiceView` | 选项按钮组；单选 / 多选；块是中断的提问且 `otherInput` 不为 `false` 时，选项后面固定多一个“输入其他内容”（点了进入输入框的回答状态，见 4.5）；已经结束的消息里 `allowFreeText` 时提示“也可以直接发消息回答”；点按后整组显示“提交中”；`state` 非 `open` 时显示**服务端记录的**选项、回答者与时间，并禁用 |
 | `confirmation` | `ConfirmationCard` | 标题、说明、细节表；破坏性操作的确认按钮用主题的“危险”样式，且必须二次点按（或按住）才能提交；是中断的块且 `otherInput` 不为 `false` 时按钮下方有“输入其他内容”；点按后显示“提交中”，服务端确认后才显示“已确认 / 已取消” |
-| `form_intent` | `IntentForm` | 按字段类型生成输入控件；客户端先做必填 / 范围 / 长度校验；服务端返回的 `fieldErrors` 显示在对应字段下；是中断的块且 `otherInput` 不为 `false` 时提交按钮下方有“输入其他内容” |
+| `form_intent` | `IntentForm` | 按字段类型生成输入控件；客户端先做必填 / 范围 / 长度校验；服务端返回的 `fieldErrors` 显示在对应字段下；是中断的块且 `otherInput` 不为 `false` 时提交按钮下方有“输入其他内容”；`title` 可选，没有标题时不留空行 |
 
 默认组件只用 Flutter `widgets` 层能力和主题接口取样式，不依赖 Material 的颜色或文字主题；按钮（含禁用态）、字段错误与进度文字显式取 ChatWeave 语义颜色，发送与关闭图标用 Canvas 自绘，不需要 MaterialIcons 字体（Markdown 渲染依赖的 `flutter_markdown_plus` 内部用到 Material，样式表仍完全由主题接口提供）。
 
@@ -137,7 +137,7 @@ final registry = BlockRegistry.withDefaults()          // 内置 12 种类型的
 | `open`，已排队（离线） | “已排队，联网后提交” | 禁用 |
 | `open`，服务端明确拒绝（`invalid_payload`、`forbidden`、`conflict` 等） | 回到未操作状态，并在块内显示服务端给的 `message`（表单显示 `fieldErrors`） | 可用（重新操作会生成新幂等键） |
 | `open`，`unavailable` 或客户端超时 | “暂时无法确认结果，正在刷新…”；**不说“失败”**，因为动作可能已经执行 | 禁用，直到刷新到服务端状态；重试复用同一幂等键 |
-| `resolved` | 服务端记录的答案（选中的选项 / 文字回答 / 已确认或已取消 / 表单值摘要）+ 回答者与时间（宿主把 `resolvedBy` 解析成显示名；一对一会话里可以不显示回答者）。如果答案不是这台设备点的（群聊里别人先答，或一对一时同一用户在另一台设备上先答），照实显示服务端记录的那个答案。用户在确认卡上点“取消”也在这里，显示“你已取消”。默认组件：已回答的选择题**只保留答案**——选中的选项各显示为一个带 ✓ 的答案胶囊，其余选项不再显示；文字回答（`freeText`，任何交互块）显示为卡片里的一个带 ✓ 的答案胶囊（可多行换行、常规字重），不再显示“你的回答：……”一行，块自己的控件也不再显示；颜色与字体取主题的 `answerBackground` / `answerForeground` / `answer`，读屏读作“已回答：北京” / “你的回答：……” | 禁用（答案胶囊不可点） |
+| `resolved` | 服务端记录的答案（选中的选项 / 文字回答 / 已确认或已取消 / 表单值摘要）+ 回答者与时间（宿主把 `resolvedBy` 解析成显示名；一对一会话里可以不显示回答者）。如果答案不是这台设备点的（群聊里别人先答，或一对一时同一用户在另一台设备上先答），照实显示服务端记录的那个答案。用户在确认卡上点“取消”也在这里，显示“你已取消”。默认组件：已回答的选择题**只保留答案**——选中的选项各显示为一个带 ✓ 的答案胶囊，其余选项不再显示；文字回答（`freeText`，任何交互块）显示为卡片里的一个带 ✓ 的答案胶囊（可多行换行、常规字重），不再显示“你的回答：……”一行，块自己的控件也不再显示；颜色与字体取主题的 `answerBackground` / `answerForeground` / `answer`，读屏读作“已回答：北京” / “你的回答：……”。用自己的字段提交的表单（`values`）同样只保留答案：标题（有的话）+ 每个非空答案一个答案胶囊，单字段表单只显示值，多字段显示“字段名：值”（下拉显示选项名，多选用“、”连接，布尔显示“是 / 否”）；没有非空答案时显示“已提交”一行；宿主自绘时可用 `formAnswers(block)` / `formAnswerLabels(block, answers)` 取同样的结果，`interactionSummary` 也用它写“已提交：……”。主题 `showResolver: false` 时默认组件不显示回答者与时间（一对一会话），不要从块里删掉 `resolvedBy` / `resolvedAt`——`resolved` 必须带 `resolvedAt`，删了块就不合法，摘要会退回 `fallbackText` | 禁用（答案胶囊不可点） |
 | `expired` / `cancelled` / `superseded` | “已过期” / “已作废” + `reason.text`（没有时按 `reason.code` 给默认文案，如“相关记录已被删除”；`stopped` 无说明时为“已停止，没有等到回答”；有 `reason.text` 时如实显示该说明，不附加“没有等到回答”）/ “已被新的请求取代”；措辞要和用户自己点的“取消”区分开 | 禁用 |
 | 没有 `ActionTransport`、会话只读，或宿主判定当前查看者不能回答 | 内容与状态照常显示，附一行简短说明（例如“仅可查看”） | 禁用；**不会**改为把选项文字作为消息发出 |
 
@@ -261,6 +261,7 @@ class ChatWeaveThemeData {
   final TextStyle answer;                 // 答案胶囊的文字样式（默认常规字重 16/1.5，可换行）
   final double fieldGap;                  // form_intent 字段的上下间距：标题与首个字段、字段之间、末个字段与提交按钮（默认 12）
   final EdgeInsetsGeometry interactionPadding; // 交互块（choice / confirmation / form_intent）默认视图的内边距（默认四周 12；宿主不加卡片外壳时可去掉左右内边距）
+  final bool showResolver;                // 已结束的交互块是否显示回答者（resolvedBy）与时间（resolvedAt）（默认 true；一对一会话可设 false）
 }
 ```
 
