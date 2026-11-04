@@ -966,12 +966,13 @@ class _InteractionBlockViewState extends State<InteractionBlockView> {
           final answered = freeText != null ||
               pickedOptions.isNotEmpty ||
               (answers?.isNotEmpty ?? false);
+          final heading = '${b.data['prompt'] ?? b.data['title'] ?? ''}';
           final showResolver = ChatWeaveTheme.of(context).showResolver;
           final children = <Widget>[
-            Text(
-              '${b.data['prompt'] ?? b.data['title'] ?? ''}',
-              style: ChatWeaveTheme.of(context).title,
-            ),
+            // form_intent's title is optional: no empty line above the
+            // fields when it is absent.
+            if (heading.trim().isNotEmpty)
+              Text(heading, style: ChatWeaveTheme.of(context).title),
             if (b.data['body'] != null) Text('${b.data['body']}'),
             if (!open && !answered) Text(interactionSummary(b, context)),
             if (showResolver &&

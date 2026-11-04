@@ -712,6 +712,38 @@ void main() {
     expect(find.text('已提交'), findsOneWidget);
   });
 
+  testWidgets('untitled_form_has_no_empty_title_row', (tester) async {
+    final b = form({
+      'status': 'open'
+    }, fields: [
+      {'key': 'title', 'label': '事项', 'type': 'text'},
+    ]);
+    validateBlock(b.json);
+    await tester.pumpWidget(app(Align(
+      alignment: Alignment.topLeft,
+      child: BuiltinBlockView(block: b),
+    )));
+    final texts = tester.widgetList<Text>(find.descendant(
+      of: find.byType(InteractionBlockView),
+      matching: find.byType(Text),
+    ));
+    expect(texts.where((t) => (t.data ?? '').trim().isEmpty), isEmpty);
+    // The first line is the read-only note, right at the top inset.
+    expect(tester.getRect(find.text('仅可查看')).top, 12);
+    for (final title in ['', '  ']) {
+      await tester.pumpWidget(app(BuiltinBlockView(
+        key: ValueKey(title),
+        block: form({'status': 'open'}, title: title),
+      )));
+      expect(
+        tester
+            .widgetList<Text>(find.byType(Text))
+            .where((t) => t.data != null && t.data!.trim().isEmpty),
+        isEmpty,
+      );
+    }
+  });
+
   testWidgets('show_resolver_false_hides_who_and_when', (tester) async {
     final b = form(resolvedWith({'title': '浇花'}), title: '新建待办');
     final base = ChatWeaveThemeData.neutralLight();
