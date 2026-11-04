@@ -24,6 +24,7 @@ class ChatWeaveThemeData {
     Color? answerBackground,
     Color? answerForeground,
     this.answer = const TextStyle(fontSize: 16, height: 1.5),
+    this.showResolver = true,
   })  : answerBackground = answerBackground ??
             (brightness == Brightness.dark
                 ? const Color(0xFF2A3038)
@@ -107,6 +108,13 @@ class ChatWeaveThemeData {
 
   /// Text style of the answer capsule (regular weight; it may wrap).
   final TextStyle answer;
+
+  /// Whether a closed interaction's default view prints who answered
+  /// (`state.resolvedBy`, an opaque member id) and when (`state.resolvedAt`)
+  /// under the question. A host where the asker is always the answerer (a
+  /// one-to-one chat) sets this to false instead of removing the fields from
+  /// the block, which would make a resolved block invalid.
+  final bool showResolver;
 }
 
 class ChatWeaveTheme extends InheritedWidget {

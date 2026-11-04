@@ -723,6 +723,64 @@ String stateLabel(Object? state, [BuildContext? context]) {
   return context == null ? label : cw(context, label);
 }
 
+/// One answer of a `form_intent` answered through its own fields.
+typedef FormAnswer = ({String key, String label, String value});
+
+/// The answers of a `form_intent` the server recorded as submitted through
+/// its fields (`state.status == 'resolved'` with `state.values`), in field
+/// order and readable: a select shows its option label(s), a boolean
+/// 是 / 否. Empty answers (missing, null, blank text, no options picked) and
+/// keys that name no field are left out, so the list may be empty.
+///
+/// Null when the block is not a form resolved that way: still open, ended
+/// without an answer, or answered with text typed through 'other input'
+/// (`state.freeText`).
+List<FormAnswer>? formAnswers(Block block, [BuildContext? context]) {
+  String say(String key) => context == null ? key : cw(context, key);
+  final state = object(block.data['state'] ?? <String, Object?>{});
+  final values = state['values'];
+  if (block.type != 'form_intent' ||
+      state['status'] != 'resolved' ||
+      state['freeText'] != null ||
+      values is! Map<Object?, Object?>) {
+    return null;
+  }
+  String text(Json field, Object value) {
+    String label(Object? id) =>
+        '${objects(field['options']).where((o) => o['id'] == id).firstOrNull?['label'] ?? id}';
+    return switch (value) {
+      bool() => say(value ? '是' : '否'),
+      num() when value.isFinite && value == value.roundToDouble() =>
+        value.toInt().toString(),
+      List<Object?>() => value.map(label).join('、'),
+      _ when field['type'] == 'single_select' => label(value),
+      _ => '$value',
+    };
+  }
+
+  return [
+    for (final field in objects(block.data['fields']))
+      if (field['key'] is String && values[field['key']] != null)
+        if (text(field, values[field['key']]!) case final value
+            when value.trim().isNotEmpty)
+          (
+            key: field['key'] as String,
+            label: '${field['label'] ?? field['key']}',
+            value: value,
+          ),
+  ];
+}
+
+/// How an answered form's answers read: a single-field form shows just the
+/// value, a form with several fields 「label：value」 per answer.
+List<String> formAnswerLabels(Block block, List<FormAnswer> answers) {
+  final single = objects(block.data['fields']).length == 1;
+  return [
+    for (final answer in answers)
+      single ? answer.value : '${answer.label}：${answer.value}',
+  ];
+}
+
 String interactionSummary(Block block, [BuildContext? context]) {
   String say(String key) => context == null ? key : cw(context, key);
   try {
@@ -743,7 +801,7 @@ String interactionSummary(Block block, [BuildContext? context]) {
                 ? say('你已确认')
                 : state['selected'] != null
                     ? '${say('已回答：')}${(state['selected'] as List<Object?>).map((id) => objects(block.data['options']).where((o) => o['id'] == id).firstOrNull?['label'] ?? id).join('、')}'
-                    : '${say('已提交：')}${state['values']}',
+                    : _submittedSummary(block, context),
     'cancelled' => reason['text'] != null
         ? '${say('已作废 · ')}${reason['text']}'
         : reason['code'] == 'stopped'
@@ -758,6 +816,17 @@ String interactionSummary(Block block, [BuildContext? context]) {
     'superseded' => say('已被新的请求取代'),
     _ => '',
   };
+}
+
+String _submittedSummary(Block block, BuildContext? context) {
+  String say(String key) => context == null ? key : cw(context, key);
+  final answers = formAnswers(block, context);
+  if (answers == null) {
+    return '${say('已提交：')}${object(block.data['state'])['values']}';
+  }
+  return answers.isEmpty
+      ? say('已提交')
+      : '${say('已提交：')}${formAnswerLabels(block, answers).join('；')}';
 }
 
 class BuiltinBlockView extends StatelessWidget {
@@ -891,7 +960,13 @@ class _InteractionBlockViewState extends State<InteractionBlockView> {
           final pickedOptions = objects(b.data['options'])
               .where((option) => picked.contains(option['id']))
               .toList();
-          final answered = freeText != null || pickedOptions.isNotEmpty;
+          // A form answered through its own fields shows its answers the
+          // same way (read-only capsules) instead of the inactive fields.
+          final answers = formAnswers(b, context);
+          final answered = freeText != null ||
+              pickedOptions.isNotEmpty ||
+              (answers?.isNotEmpty ?? false);
+          final showResolver = ChatWeaveTheme.of(context).showResolver;
           final children = <Widget>[
             Text(
               '${b.data['prompt'] ?? b.data['title'] ?? ''}',
@@ -899,11 +974,15 @@ class _InteractionBlockViewState extends State<InteractionBlockView> {
             ),
             if (b.data['body'] != null) Text('${b.data['body']}'),
             if (!open && !answered) Text(interactionSummary(b, context)),
-            if (!open && object(b.data['state'])['resolvedBy'] != null)
+            if (showResolver &&
+                !open &&
+                object(b.data['state'])['resolvedBy'] != null)
               Text(
                 '${cw(context, '回答者：')}${object(b.data['state'])['resolvedBy']}',
               ),
-            if (!open && object(b.data['state'])['resolvedAt'] != null)
+            if (showResolver &&
+                !open &&
+                object(b.data['state'])['resolvedAt'] != null)
               Text('${object(b.data['state'])['resolvedAt']}'),
             if (local.locked && open)
               DefaultLabel(switch (local.phase) {
@@ -958,6 +1037,15 @@ class _InteractionBlockViewState extends State<InteractionBlockView> {
                         label: freeText,
                         semanticsPrefix: '你的回答：',
                       )
+                    else if (answers != null)
+                      for (final (i, label)
+                          in formAnswerLabels(b, answers).indexed)
+                        AnswerCapsule(
+                          key: ValueKey(
+                              'chatweave-answer-field-${answers[i].key}'),
+                          label: label,
+                          semanticsPrefix: '已回答：',
+                        )
                     else
                       for (final option in pickedOptions)
                         AnswerCapsule(
@@ -1038,7 +1126,7 @@ class _InteractionBlockViewState extends State<InteractionBlockView> {
                 ],
               ),
             );
-          } else {
+          } else if (answers == null) {
             children.add(
               Form(
                 key: _form,
