@@ -15,6 +15,21 @@ pub use validation::{DocumentKind, SchemaRegistry, Validator, validate};
 
 pub const PROTOCOL_VERSION: &str = "0.1";
 
+/// Every `error.code` a stream event (`message.end`, `block.end`, `error`)
+/// may carry: the closed enum of `stream-event.schema.json#/$defs/error`.
+pub const STREAM_ERROR_CODES: &[&str] = &[
+    "invalid_request",
+    "unauthorized",
+    "not_found",
+    "resume_unavailable",
+    "limit_exceeded",
+    "validation_failed",
+    "upstream_failed",
+    "cancelled",
+    "interrupt_expired",
+    "internal",
+];
+
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("{code} at {path}: {message}")]
 pub struct ProtocolError {
