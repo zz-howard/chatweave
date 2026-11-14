@@ -114,6 +114,7 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 | `comparison` | 多个对象在多个维度上的比较 | 对比表 | 表格 → `fallbackText` |
 | `breakdown` | 一个整体由哪些部分组成（占比） | 环形图 + 图例 | 表格（由数据转换）→ `fallbackText` |
 | `category_series` | 按类别或分段排列的一组数值（各项比大小） | 柱状图 | 表格（由数据转换）→ `fallbackText` |
+| `diagram` | 有序步骤与架构关系（每步可有并排框） | 示意图（由支持它的宿主提供；Flutter 本轮只显示文字兜底） | 直接 `fallbackText`，没有内置转换降级链 |
 | `status` | 状态与进度（含步骤） | 状态条 / 进度条 | `fallbackText` |
 | `choice` | 请用户从选项中选（如澄清问题） | 选项按钮组 | 编号列表文本，提示用户直接回复 |
 | `confirmation` | 请用户确认或取消某个操作 | 确认卡 | 文本 +“请在新版本中确认” |
@@ -223,6 +224,59 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 }
 ```
 1–24 个点，按生产方给的顺序显示（按时间分段就按时间排，按类别比大小就由生产方先排好序）。`value` 可以为负，`null` 表示没有数据。`reference` 是一条可选参考线（如平均值、目标）；`assessment` 用于标出需要注意的那一项。和 `time_series` 的区别：`time_series` 讲连续的变化趋势，`category_series` 讲几个离散项之间比大小（例如每个成员、每个月一项）。
+
+#### `diagram`
+
+表达按顺序连接的步骤或架构关系，不接收 SVG、HTML 或任意边。连接属于相邻两步，不能指定某个框连到哪个框。`schemaVersion` 为 1。
+
+下表路径从 `data` 开始，唯有 `fallbackText` 位于块顶层。除了通用块字段，最小内容只需 `steps`、每步 `nodes`、每个框的 `label` 和块的 `fallbackText`；存在可选分组时，该组的 `label`、`from`、`to` 都必须填写。
+
+| 字段 | 必填 | 限制与默认值 |
+|---|---|---|
+| `title` | | 块标题，1–120 字符；省略时不显示标题 |
+| `direction` | | `vertical` / `horizontal`；省略为 `vertical`。横排超过 5 步仍合法，渲染时改为竖排；块实际宽度小于 520px 时也改为竖排 |
+| `steps` | ✅ | 按显示顺序排列的 2–8 步 |
+| `steps[].id` | | 可选，格式沿用块 ID：`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`（1–64 字符）；已提供的 ID 在本块内必须唯一。分组引用的步骤必须提供 ID |
+| `steps[].nodes` | ✅ | 每步 1–3 个框；同一步多个框并排 |
+| `steps[].nodes[].label` | ✅ | 框标题，1–40 字符，纯文字 |
+| `steps[].nodes[].detail` | | 一行说明，最多 120 字符，纯文字；省略时不显示 |
+| `steps[].nodes[].icon` | | 图标名，只校验 `^[a-z][a-z0-9-]{0,31}$`；省略或客户端不认识时不画图标 |
+| `steps[].nodes[].highlight` | | 布尔值；省略为不突出显示，`true` 时使用主题的重点样式 |
+| `steps[].link` | | 到下一步的连接；省略为不带文字的单向箭头。最后一步即使提供了合法的 `link` 也忽略，不因此报错 |
+| `steps[].link.arrow` | | `forward`（单向）/ `both`（双向）/ `none`（仅连线）；省略为 `forward` |
+| `steps[].link.label` | | 连接文字，最多 40 字符；省略为不带文字 |
+| `groups` | | 最多 3 组；省略或空数组为不分组 |
+| `groups[].label` | ✅（有该组时） | 组名，1–24 字符 |
+| `groups[].from` / `groups[].to` | ✅（有该组时） | 引用本块已提供的步骤 ID；按步骤顺序取包含首尾的连续范围。`from` 可等于 `to`，不得在 `to` 后面；任意两组不得共用一步，包括共用端点 |
+| `summary` | | 图下说明，最多 2000 字符；省略时不显示 |
+| 块顶层 `fallbackText` | ✅ | 完整文字版，最多 2000 字符；没有内置转换降级链，不支持画图时直接显示它 |
+
+**已知图标名单（28 个）**：`user`、`users`、`bot`、`smartphone`、`monitor`、`glasses`、`server`、`database`、`cloud`、`globe`、`network`、`code`、`terminal`、`layers`、`component`、`tool`、`settings`、`file`、`book`、`chart`、`message`、`key`、`lock`、`clock`、`alert`、`check`、`search`、`target`。生产方应优先使用这些通用名字，客户端映射到自己的图标。**此名单不是发送白名单**：格式合法的名单外名字照常接受；客户端不认识时只省略图标，框与文字照常显示。增加图标名不需要提升 `schemaVersion`。
+
+```json
+{
+  "id": "architecture", "type": "diagram", "schemaVersion": 1,
+  "data": {
+    "title": "消息流转", "direction": "horizontal",
+    "steps": [
+      { "id": "client", "nodes": [{ "label": "客户端", "icon": "smartphone" }], "link": { "arrow": "both", "label": "请求与响应" } },
+      { "id": "service", "nodes": [{ "label": "服务", "icon": "server", "highlight": true }, { "label": "工具", "icon": "tool", "detail": "并行处理" }] },
+      { "id": "storage", "nodes": [{ "label": "存储", "icon": "database" }] }
+    ],
+    "groups": [{ "label": "处理端", "from": "service", "to": "storage" }],
+    "summary": "服务与工具位于同一步，连接指向下一整步。"
+  },
+  "fallbackText": "客户端与处理端双向通信；处理端的服务和工具并行处理，再连接到存储。"
+}
+```
+
+最小合法块（省略步骤 ID、排列方式、连接与图标）：
+
+```json
+{ "id": "flow", "type": "diagram", "schemaVersion": 1, "data": { "steps": [{ "nodes": [{ "label": "输入" }] }, { "nodes": [{ "label": "输出" }] }] }, "fallbackText": "输入 → 输出" }
+```
+
+Flutter 本轮不实现画图组件，只按第 6 节显示 `fallbackText`；默认注册表识别 `diagram`，其能力声明只保证本轮的文字兜底，图形渲染需由宿主提供。
 
 #### `status`
 
@@ -612,11 +666,13 @@ streaming ──message.paused──▶ paused ──(回答) block.patch + mess
 ```json
 {
   "protocolVersions": ["0.1"],
-  "blocks": { "markdown": 1, "metric": 1, "metric_group": 1, "dataset": 1, "time_series": 1, "comparison": 1, "breakdown": 1, "category_series": 1, "status": 1, "choice": 1, "confirmation": 1, "form_intent": 1, "x-todo.task_card": 1 },
+  "blocks": { "markdown": 1, "metric": 1, "metric_group": 1, "dataset": 1, "time_series": 1, "comparison": 1, "breakdown": 1, "category_series": 1, "diagram": 1, "status": 1, "choice": 1, "confirmation": 1, "form_intent": 1, "x-todo.task_card": 1 },
   "features": ["stream.resume", "stream.snapshot", "stream.activity", "stream.steps", "action.choice", "action.confirmation", "action.form"],
   "locale": "zh-CN"
 }
 ```
+
+本轮 Flutter 默认注册表也会声明 `diagram: 1`，但只显示其 `fallbackText`；该声明不表示已经实现图形组件。
 
 放不进请求体的场合（例如 SSE 的 GET 请求）用紧凑请求头：
 
@@ -667,6 +723,9 @@ ChatWeave-Protocol: 0.1
 | `comparison` 对象 / 维度 / 单元格 | 6 / 12 / 72 |
 | `breakdown` 部分 | 2–12 |
 | `category_series` 点 | 1–24 |
+| `diagram` 步数 / 每步框数 / 分组数 | 2–8 / 1–3 / 最多 3；横排超过 5 步不拒收，改画竖排 |
+| `diagram` 框标题 / 框说明 / 连接文字 / 组名 | 1–40 / 120 / 40 / 1–24 字符 |
+| `diagram` 标题 / 摘要 / 块 `fallbackText` | 120 / 2000 / 2000 字符 |
 | `choice.options` | 10 |
 | `form_intent.fields` / 每字段选项 | 12 / 20 |
 | 普通标签 / 短按钮文字 / 说明文字 | 120 / 24 / 2000 字符 |

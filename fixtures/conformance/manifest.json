@@ -12,6 +12,418 @@
   ],
   "cases": [
     {
+      "name": "diagram-no-step-ids",
+      "kind": "block",
+      "file": "diagrams/no-step-ids.json",
+      "schema": "content-block.schema.json"
+    },
+    {
+      "name": "diagram-empty-links",
+      "kind": "block",
+      "file": "diagrams/empty-links.json",
+      "schema": "content-block.schema.json"
+    },
+    {
+      "name": "diagram-group-endpoint-empty",
+      "kind": "block",
+      "file": "diagrams/group-endpoint-empty.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/group-endpoint-empty.expected-error.json"
+    },
+    {
+      "name": "diagram-link-arrow-type",
+      "kind": "block",
+      "file": "diagrams/link-arrow-type.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/link-arrow-type.expected-error.json"
+    },
+    {
+      "name": "diagram-group-no-present-id",
+      "kind": "block",
+      "file": "diagrams/group-no-present-id.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "semantic",
+      "expectedError": "diagrams/group-no-present-id.expected-error.json"
+    },
+    {
+      "name": "diagram-minimal",
+      "kind": "block",
+      "file": "diagrams/minimal.json",
+      "schema": "content-block.schema.json"
+    },
+    {
+      "name": "diagram-boundaries",
+      "kind": "block",
+      "file": "diagrams/boundaries.json",
+      "schema": "content-block.schema.json"
+    },
+    {
+      "name": "diagram-horizontal-six-steps",
+      "kind": "block",
+      "file": "diagrams/horizontal-six-steps.json",
+      "schema": "content-block.schema.json"
+    },
+    {
+      "name": "diagram-horizontal-empty-optionals",
+      "kind": "block",
+      "file": "diagrams/horizontal-empty-optionals.json",
+      "schema": "content-block.schema.json"
+    },
+    {
+      "name": "diagram-adjacent-single-step-groups",
+      "kind": "block",
+      "file": "diagrams/adjacent-single-step-groups.json",
+      "schema": "content-block.schema.json"
+    },
+    {
+      "name": "diagram-steps-one",
+      "kind": "block",
+      "file": "diagrams/steps-one.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/steps-one.expected-error.json"
+    },
+    {
+      "name": "diagram-steps-nine",
+      "kind": "block",
+      "file": "diagrams/steps-nine.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/steps-nine.expected-error.json"
+    },
+    {
+      "name": "diagram-steps-missing",
+      "kind": "block",
+      "file": "diagrams/steps-missing.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/steps-missing.expected-error.json"
+    },
+    {
+      "name": "diagram-step-id-missing",
+      "kind": "block",
+      "file": "diagrams/step-id-missing.json",
+      "schema": "content-block.schema.json"
+    },
+    {
+      "name": "diagram-step-id-empty",
+      "kind": "block",
+      "file": "diagrams/step-id-empty.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/step-id-empty.expected-error.json"
+    },
+    {
+      "name": "diagram-step-nodes-missing",
+      "kind": "block",
+      "file": "diagrams/step-nodes-missing.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/step-nodes-missing.expected-error.json"
+    },
+    {
+      "name": "diagram-nodes-zero",
+      "kind": "block",
+      "file": "diagrams/nodes-zero.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/nodes-zero.expected-error.json"
+    },
+    {
+      "name": "diagram-nodes-four",
+      "kind": "block",
+      "file": "diagrams/nodes-four.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/nodes-four.expected-error.json"
+    },
+    {
+      "name": "diagram-node-label-missing",
+      "kind": "block",
+      "file": "diagrams/node-label-missing.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/node-label-missing.expected-error.json"
+    },
+    {
+      "name": "diagram-node-label-empty",
+      "kind": "block",
+      "file": "diagrams/node-label-empty.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/node-label-empty.expected-error.json"
+    },
+    {
+      "name": "diagram-node-label-41",
+      "kind": "block",
+      "file": "diagrams/node-label-41.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/node-label-41.expected-error.json"
+    },
+    {
+      "name": "diagram-node-detail-121",
+      "kind": "block",
+      "file": "diagrams/node-detail-121.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/node-detail-121.expected-error.json"
+    },
+    {
+      "name": "diagram-node-icon-empty",
+      "kind": "block",
+      "file": "diagrams/node-icon-empty.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/node-icon-empty.expected-error.json"
+    },
+    {
+      "name": "diagram-node-icon-uppercase",
+      "kind": "block",
+      "file": "diagrams/node-icon-uppercase.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/node-icon-uppercase.expected-error.json"
+    },
+    {
+      "name": "diagram-node-icon-leading-number",
+      "kind": "block",
+      "file": "diagrams/node-icon-leading-number.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/node-icon-leading-number.expected-error.json"
+    },
+    {
+      "name": "diagram-node-icon-underscore",
+      "kind": "block",
+      "file": "diagrams/node-icon-underscore.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/node-icon-underscore.expected-error.json"
+    },
+    {
+      "name": "diagram-node-icon-33",
+      "kind": "block",
+      "file": "diagrams/node-icon-33.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/node-icon-33.expected-error.json"
+    },
+    {
+      "name": "diagram-node-highlight-string",
+      "kind": "block",
+      "file": "diagrams/node-highlight-string.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/node-highlight-string.expected-error.json"
+    },
+    {
+      "name": "diagram-link-arrow-invalid",
+      "kind": "block",
+      "file": "diagrams/link-arrow-invalid.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/link-arrow-invalid.expected-error.json"
+    },
+    {
+      "name": "diagram-link-arrow-missing",
+      "kind": "block",
+      "file": "diagrams/link-arrow-missing.json",
+      "schema": "content-block.schema.json"
+    },
+    {
+      "name": "diagram-link-label-41",
+      "kind": "block",
+      "file": "diagrams/link-label-41.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/link-label-41.expected-error.json"
+    },
+    {
+      "name": "diagram-direction-invalid",
+      "kind": "block",
+      "file": "diagrams/direction-invalid.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/direction-invalid.expected-error.json"
+    },
+    {
+      "name": "diagram-title-121",
+      "kind": "block",
+      "file": "diagrams/title-121.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/title-121.expected-error.json"
+    },
+    {
+      "name": "diagram-summary-2001",
+      "kind": "block",
+      "file": "diagrams/summary-2001.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/summary-2001.expected-error.json"
+    },
+    {
+      "name": "diagram-fallback-missing",
+      "kind": "block",
+      "file": "diagrams/fallback-missing.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/fallback-missing.expected-error.json"
+    },
+    {
+      "name": "diagram-fallback-2001",
+      "kind": "block",
+      "file": "diagrams/fallback-2001.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/fallback-2001.expected-error.json"
+    },
+    {
+      "name": "diagram-groups-four",
+      "kind": "block",
+      "file": "diagrams/groups-four.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/groups-four.expected-error.json"
+    },
+    {
+      "name": "diagram-group-label-missing",
+      "kind": "block",
+      "file": "diagrams/group-label-missing.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/group-label-missing.expected-error.json"
+    },
+    {
+      "name": "diagram-group-label-empty",
+      "kind": "block",
+      "file": "diagrams/group-label-empty.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/group-label-empty.expected-error.json"
+    },
+    {
+      "name": "diagram-group-label-25",
+      "kind": "block",
+      "file": "diagrams/group-label-25.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/group-label-25.expected-error.json"
+    },
+    {
+      "name": "diagram-group-from-missing",
+      "kind": "block",
+      "file": "diagrams/group-from-missing.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/group-from-missing.expected-error.json"
+    },
+    {
+      "name": "diagram-group-to-missing",
+      "kind": "block",
+      "file": "diagrams/group-to-missing.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/group-to-missing.expected-error.json"
+    },
+    {
+      "name": "diagram-node-unknown-field",
+      "kind": "block",
+      "file": "diagrams/node-unknown-field.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/node-unknown-field.expected-error.json"
+    },
+    {
+      "name": "diagram-link-unknown-field",
+      "kind": "block",
+      "file": "diagrams/link-unknown-field.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/link-unknown-field.expected-error.json"
+    },
+    {
+      "name": "diagram-step-unknown-field",
+      "kind": "block",
+      "file": "diagrams/step-unknown-field.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/step-unknown-field.expected-error.json"
+    },
+    {
+      "name": "diagram-group-unknown-field",
+      "kind": "block",
+      "file": "diagrams/group-unknown-field.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/group-unknown-field.expected-error.json"
+    },
+    {
+      "name": "diagram-data-unknown-field",
+      "kind": "block",
+      "file": "diagrams/data-unknown-field.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "schema",
+      "expectedError": "diagrams/data-unknown-field.expected-error.json"
+    },
+    {
+      "name": "diagram-duplicate-step-id",
+      "kind": "block",
+      "file": "diagrams/duplicate-step-id.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "semantic",
+      "expectedError": "diagrams/duplicate-step-id.expected-error.json"
+    },
+    {
+      "name": "diagram-last-step-link",
+      "kind": "block",
+      "file": "diagrams/last-step-link.json",
+      "schema": "content-block.schema.json"
+    },
+    {
+      "name": "diagram-group-from-unknown",
+      "kind": "block",
+      "file": "diagrams/group-from-unknown.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "semantic",
+      "expectedError": "diagrams/group-from-unknown.expected-error.json"
+    },
+    {
+      "name": "diagram-group-to-unknown",
+      "kind": "block",
+      "file": "diagrams/group-to-unknown.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "semantic",
+      "expectedError": "diagrams/group-to-unknown.expected-error.json"
+    },
+    {
+      "name": "diagram-group-reversed",
+      "kind": "block",
+      "file": "diagrams/group-reversed.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "semantic",
+      "expectedError": "diagrams/group-reversed.expected-error.json"
+    },
+    {
+      "name": "diagram-groups-overlap",
+      "kind": "block",
+      "file": "diagrams/groups-overlap.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "semantic",
+      "expectedError": "diagrams/groups-overlap.expected-error.json"
+    },
+    {
+      "name": "diagram-groups-shared-step",
+      "kind": "block",
+      "file": "diagrams/groups-shared-step.json",
+      "schema": "content-block.schema.json",
+      "rejectAt": "semantic",
+      "expectedError": "diagrams/groups-shared-step.expected-error.json"
+    },
+    {
       "name": "markdown-valid",
       "kind": "block",
       "file": "blocks/markdown-valid.json",

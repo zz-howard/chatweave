@@ -1,0 +1,65 @@
+{
+  "id": "diagram-1",
+  "type": "diagram",
+  "schemaVersion": 1,
+  "data": {
+    "steps": [
+      {
+        "id": "s1",
+        "nodes": [
+          {
+            "label": "Step 1",
+            "icon": "future-valid-icon"
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "nodes": [
+          {
+            "label": "Step 2",
+            "icon": "future-valid-icon"
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "nodes": [
+          {
+            "label": "Step 3",
+            "icon": "future-valid-icon"
+          }
+        ]
+      },
+      {
+        "id": "s4",
+        "nodes": [
+          {
+            "label": "Step 4",
+            "icon": "future-valid-icon"
+          }
+        ]
+      },
+      {
+        "id": "s5",
+        "nodes": [
+          {
+            "label": "Step 5",
+            "icon": "future-valid-icon"
+          }
+        ]
+      },
+      {
+        "id": "s6",
+        "nodes": [
+          {
+            "label": "Step 6",
+            "icon": "future-valid-icon"
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal"
+  },
+  "fallbackText": "Start then finish"
+}

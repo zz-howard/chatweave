@@ -54,6 +54,101 @@ fn merge_patch_removes_null_and_replaces_arrays() {
     assert_eq!(value, json!({"data":{"keep":1,"items":[3]}}));
 }
 #[test]
+fn diagram_data_parses_nodes_and_preserves_optional_wire_fields() {
+    use chatweave_protocol::BlockData;
+
+    let value = json!({
+        "title": "Message flow",
+        "steps": [{"id": "source", "nodes": [{
+            "label": "Client", "detail": "Sends a message", "icon": "smartphone",
+            "highlight": false, "futureField": null
+        }]}],
+        "summary": "A message source"
+    });
+    let parsed = BlockData::parse("diagram", value.clone()).unwrap();
+    let BlockData::Diagram(ref data) = parsed else {
+        panic!("diagram must have typed data");
+    };
+    assert_eq!(data.steps[0].extra["id"], "source");
+    assert_eq!(data.steps[0].nodes[0].label, "Client");
+    assert_eq!(parsed.to_value().unwrap(), value);
+    assert!(
+        BlockData::parse(
+            "diagram",
+            json!({"steps": [{"id": "source", "nodes": [{"icon": "bot"}]}]})
+        )
+        .is_err()
+    );
+}
+#[test]
+fn diagram_defaults_and_group_ranges_use_wire_step_order() {
+    let validator = Validator::default();
+    let mut block = json!({
+        "id": "diagram", "type": "diagram", "schemaVersion": 1,
+        "fallbackText": "First then second",
+        "data": {"steps": [
+            {"nodes": [{"label": "First", "icon": "future-icon"}], "link": {}},
+            {"nodes": [{"label": "Second"}], "link": {"arrow": "both"}}
+        ]}
+    });
+    assert!(validator.validate(DocumentKind::Block, &block).is_ok());
+    let parsed = Block(block.clone()).typed_data().unwrap().unwrap();
+    assert_eq!(parsed.to_value().unwrap(), block["data"]);
+    block["data"]["steps"][0]["id"] = json!("first");
+    block["data"]["steps"][1]["id"] = json!("second");
+    block["data"]["groups"] = json!([
+        {"label": "First", "from": "first", "to": "first"},
+        {"label": "Second", "from": "second", "to": "second"}
+    ]);
+    assert!(validator.validate(DocumentKind::Block, &block).is_ok());
+    block["data"]["groups"][1]["from"] = json!("first");
+    assert_eq!(
+        validator
+            .validate(DocumentKind::Block, &block)
+            .unwrap_err()
+            .code,
+        "diagram_group_overlap"
+    );
+    block["data"]["groups"] = json!([{"label": "Reverse", "from": "second", "to": "first"}]);
+    assert_eq!(
+        validator
+            .validate(DocumentKind::Block, &block)
+            .unwrap_err()
+            .code,
+        "diagram_group_order"
+    );
+    block["data"]["groups"][0]["to"] = json!("missing");
+    assert_eq!(
+        validator
+            .validate(DocumentKind::Block, &block)
+            .unwrap_err()
+            .code,
+        "diagram_group_endpoint"
+    );
+    block["data"]["steps"][1]["id"] = json!("first");
+    assert_eq!(
+        validator
+            .validate(DocumentKind::Block, &block)
+            .unwrap_err()
+            .code,
+        "duplicate_diagram_step_id"
+    );
+}
+#[test]
+fn diagram_lifecycle_allows_absent_data_but_checks_present_data() {
+    let validator = Validator::default();
+    for status in ["pending", "error"] {
+        let mut block = json!({
+            "id": "diagram", "type": "diagram", "schemaVersion": 1,
+            "status": status, "fallbackText": "Waiting for diagram"
+        });
+        assert!(validator.validate(DocumentKind::Block, &block).is_ok());
+        assert!(Block(block.clone()).typed_data().unwrap().is_none());
+        block["data"] = json!({});
+        assert!(validator.validate(DocumentKind::Block, &block).is_err());
+    }
+}
+#[test]
 fn limits_measure_utf8_and_can_only_be_tightened() {
     let limits = Limits::default();
     assert!(

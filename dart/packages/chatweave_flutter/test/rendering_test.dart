@@ -14,6 +14,35 @@ Block block(String type, {String id = 'b'}) => Block.fromJson({
 Widget app(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 void main() {
+  testWidgets('diagram_uses_block_fallback_and_preserves_markdown_sibling',
+      (tester) async {
+    final errors = <Object>[];
+    final registry = BlockRegistry.withDefaults(
+        onBlockRenderError: (_, error) => errors.add(error));
+    final diagram = Block.fromJson({
+      'id': 'diagram',
+      'type': 'diagram',
+      'schemaVersion': 1,
+      'fallbackText': 'Client sends a message to Server.',
+      'data': {
+        'steps': [
+          {'id': 'client', 'nodes': [{'label': 'Client'}]},
+          {'id': 'server', 'nodes': [{'label': 'Server'}]},
+        ],
+      },
+    });
+    await tester.pumpWidget(app(Column(children: [
+      registry.render(block('markdown', id: 'sibling')),
+      registry.render(diagram),
+    ])));
+    expect(find.text('Client sends a message to Server.'), findsOneWidget);
+    expect(find.byType(FallbackNote), findsOneWidget);
+    expect(find.byType(MarkdownBlockView), findsOneWidget);
+    expect(fallbackConversion(diagram), isNull);
+    expect(errors, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   group('messagePlainText', () {
     Message messageWith(List<Json> blocks, {List<Json> steps = const []}) =>
         Message.fromJson({

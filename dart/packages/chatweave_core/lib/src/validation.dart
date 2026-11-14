@@ -10,6 +10,7 @@ const builtinTypes = {
   'comparison',
   'breakdown',
   'category_series',
+  'diagram',
   'status',
   'choice',
   'confirmation',
@@ -69,6 +70,7 @@ void _validateBlock(Json b, {Limits limits = const Limits()}) {
     'comparison' => ['subjects', 'attributes', 'values'],
     'breakdown' => ['parts'],
     'category_series' => ['points'],
+    'diagram' => ['steps'],
     'status' => ['label', 'state'],
     'choice' => ['prompt', 'options', 'action'],
     'confirmation' => ['title', 'action'],
@@ -91,8 +93,40 @@ void _validateBlock(Json b, {Limits limits = const Limits()}) {
           .accepts(data, 'content-block.schema.json#/\$defs/$definition')) {
     throw const ProtocolError('validation_failed');
   }
+  if (b['type'] == 'diagram' && b['schemaVersion'] == 1) {
+    _validateDiagram(data);
+  }
   if (object(b['metadata'] ?? <String, Object?>{})['provenance'] == 'adapter' &&
       b['type'] != 'markdown') throw const ProtocolError('invalid_provenance');
+}
+
+void _validateDiagram(Json data) {
+  final steps = objects(data['steps']);
+  final positions = <String, int>{};
+  for (var i = 0; i < steps.length; i++) {
+    final id = steps[i]['id'] as String?;
+    if (id == null) continue;
+    if (positions.containsKey(id)) {
+      throw const ProtocolError('duplicate_diagram_step_id');
+    }
+    positions[id] = i;
+  }
+  final grouped = <int>{};
+  for (final group in objects(data['groups'])) {
+    final from = positions[group['from']];
+    final to = positions[group['to']];
+    if (from == null || to == null) {
+      throw const ProtocolError('invalid_diagram_group_endpoint');
+    }
+    if (from > to) {
+      throw const ProtocolError('invalid_diagram_group_order');
+    }
+    for (var i = from; i <= to; i++) {
+      if (!grouped.add(i)) {
+        throw const ProtocolError('overlapping_diagram_groups');
+      }
+    }
+  }
 }
 
 void validateMessage(Json m,

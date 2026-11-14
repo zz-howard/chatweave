@@ -1,0 +1,30 @@
+{
+  "id": "diagram-1",
+  "type": "diagram",
+  "schemaVersion": 1,
+  "data": {
+    "steps": [
+      {
+        "id": "s1",
+        "nodes": [
+          {
+            "label": "Start"
+          }
+        ],
+        "link": {
+          "arrow": "forward",
+          "to": "s2"
+        }
+      },
+      {
+        "id": "s2",
+        "nodes": [
+          {
+            "label": "Finish"
+          }
+        ]
+      }
+    ]
+  },
+  "fallbackText": "Start then finish"
+}

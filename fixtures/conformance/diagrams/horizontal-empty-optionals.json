@@ -1,0 +1,32 @@
+{
+  "id": "diagram-1",
+  "type": "diagram",
+  "schemaVersion": 1,
+  "data": {
+    "steps": [
+      {
+        "id": "s1",
+        "nodes": [
+          {
+            "label": "Start"
+          }
+        ],
+        "link": {
+          "arrow": "both"
+        }
+      },
+      {
+        "id": "s2",
+        "nodes": [
+          {
+            "label": "Finish"
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "summary": "",
+    "groups": []
+  },
+  "fallbackText": ""
+}

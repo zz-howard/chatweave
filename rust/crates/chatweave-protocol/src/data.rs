@@ -80,6 +80,15 @@ data_struct!(CategoryPoint {
     value: Option<Number>
 });
 data_struct!(CategorySeriesData { points: Vec<CategoryPoint> });
+data_struct!(DiagramNode { label: String });
+data_struct!(DiagramLink {});
+data_struct!(DiagramStep { nodes: Vec<DiagramNode> });
+data_struct!(DiagramGroup {
+    label: String,
+    from: String,
+    to: String
+});
+data_struct!(DiagramData { steps: Vec<DiagramStep> });
 data_struct!(StatusData {
     label: String,
     state: String
@@ -115,6 +124,7 @@ pub enum BlockData {
     Comparison(ComparisonData),
     Breakdown(BreakdownData),
     CategorySeries(CategorySeriesData),
+    Diagram(DiagramData),
     Status(StatusData),
     Choice(ChoiceData),
     Confirmation(ConfirmationData),
@@ -139,6 +149,7 @@ impl BlockData {
             "comparison" => parse!(ComparisonData, Comparison),
             "breakdown" => parse!(BreakdownData, Breakdown),
             "category_series" => parse!(CategorySeriesData, CategorySeries),
+            "diagram" => parse!(DiagramData, Diagram),
             "status" => parse!(StatusData, Status),
             "choice" => parse!(ChoiceData, Choice),
             "confirmation" => parse!(ConfirmationData, Confirmation),
@@ -162,6 +173,7 @@ impl BlockData {
             Self::Comparison(v) => value!(v),
             Self::Breakdown(v) => value!(v),
             Self::CategorySeries(v) => value!(v),
+            Self::Diagram(v) => value!(v),
             Self::Status(v) => value!(v),
             Self::Choice(v) => value!(v),
             Self::Confirmation(v) => value!(v),

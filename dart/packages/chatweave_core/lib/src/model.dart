@@ -224,6 +224,7 @@ sealed class BlockData extends WireModel {
         'comparison' => ComparisonData(json),
         'breakdown' => BreakdownData(json),
         'category_series' => CategorySeriesData(json),
+        'diagram' => DiagramData(json),
         'status' => StatusData(json),
         'choice' => ChoiceData(json),
         'confirmation' => ConfirmationData(json),
@@ -277,6 +278,47 @@ class BreakdownData extends BlockData {
 class CategorySeriesData extends BlockData {
   CategorySeriesData(super.json);
   List<Json> get points => objects(this.json['points']);
+}
+
+class DiagramData extends BlockData {
+  DiagramData(super.json);
+  String? get title => this.json['title'] as String?;
+  String? get summary => this.json['summary'] as String?;
+  String get direction => this.json['direction'] as String? ?? 'vertical';
+  List<DiagramStep> get steps =>
+      objects(this.json['steps']).map(DiagramStep.new).toList();
+  List<DiagramGroup> get groups =>
+      objects(this.json['groups']).map(DiagramGroup.new).toList();
+}
+
+class DiagramStep extends WireModel {
+  DiagramStep(super.json);
+  String? get id => this.json['id'] as String?;
+  List<DiagramNode> get nodes =>
+      objects(this.json['nodes']).map(DiagramNode.new).toList();
+  DiagramLink? get link =>
+      this.json['link'] == null ? null : DiagramLink(object(this.json['link']));
+}
+
+class DiagramGroup extends WireModel {
+  DiagramGroup(super.json);
+  String get label => this.json['label'] as String;
+  String get from => this.json['from'] as String;
+  String get to => this.json['to'] as String;
+}
+
+class DiagramNode extends WireModel {
+  DiagramNode(super.json);
+  String get label => this.json['label'] as String;
+  String? get detail => this.json['detail'] as String?;
+  String? get icon => this.json['icon'] as String?;
+  bool? get highlight => this.json['highlight'] as bool?;
+}
+
+class DiagramLink extends WireModel {
+  DiagramLink(super.json);
+  String get arrow => this.json['arrow'] as String? ?? 'forward';
+  String? get label => this.json['label'] as String?;
 }
 
 class StatusData extends BlockData {

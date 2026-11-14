@@ -236,6 +236,9 @@ impl Validator {
         self.limits.check_block(block)?;
         Block(block.clone()).typed_data()?;
         let ty = block["type"].as_str().unwrap_or("");
+        if ty == "diagram" {
+            check_diagram(&block["data"])?;
+        }
         if ty.starts_with("x-") {
             let version = block["schemaVersion"].as_u64().unwrap_or(0) as u32;
             match (self.custom.get(&(ty.into(), version)), block.get("data")) {
@@ -432,6 +435,60 @@ impl Validator {
         self.validate(DocumentKind::Message, &message.0)?;
         Ok(message)
     }
+}
+fn check_diagram(data: &Value) -> Result<()> {
+    let Some(steps) = data["steps"].as_array() else {
+        return Ok(());
+    };
+    let mut ids = BTreeMap::new();
+    for (index, step) in steps.iter().enumerate() {
+        let Some(id) = step["id"].as_str() else {
+            continue;
+        };
+        if ids.insert(id, index).is_some() {
+            return Err(ProtocolError::new(
+                "duplicate_diagram_step_id",
+                format!("/data/steps/{index}/id"),
+                "diagram step ids must be unique",
+            ));
+        }
+    }
+    let mut grouped = BTreeSet::new();
+    if let Some(groups) = data["groups"].as_array() {
+        for (index, group) in groups.iter().enumerate() {
+            let path = format!("/data/groups/{index}");
+            let endpoint = |field: &str| -> Result<usize> {
+                ids.get(group[field].as_str().unwrap_or(""))
+                    .copied()
+                    .ok_or_else(|| {
+                        ProtocolError::new(
+                            "diagram_group_endpoint",
+                            format!("{path}/{field}"),
+                            "group endpoints must name existing diagram steps",
+                        )
+                    })
+            };
+            let from = endpoint("from")?;
+            let to = endpoint("to")?;
+            if from > to {
+                return Err(ProtocolError::new(
+                    "diagram_group_order",
+                    &path,
+                    "group endpoints must follow diagram step order",
+                ));
+            }
+            for step in from..=to {
+                if !grouped.insert(step) {
+                    return Err(ProtocolError::new(
+                        "diagram_group_overlap",
+                        &path,
+                        "diagram groups cannot share a step",
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
 }
 pub(crate) fn builtin() -> &'static Validator {
     static VALUE: OnceLock<Validator> = OnceLock::new();

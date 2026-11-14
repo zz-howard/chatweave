@@ -63,12 +63,15 @@ final registry = BlockRegistry.withDefaults()          // 内置 12 种类型的
 | `comparison` | `ComparisonTable` | 对象为列、维度为行；`assessment` 用主题的语义色 + 文字标签；结论在表下方 |
 | `breakdown` | `BreakdownView` | 自绘环形图，中心显示各部分之和；下方图例逐项列出数值和占比（图例本身就是可读的文字版）；超过调色板长度的部分用降低透明度的同色区分 |
 | `category_series` | `CategorySeriesView` | 自绘柱状图，从零起画（支持负数），`null` 不画柱；参考线为虚线并在图下用文字说明；`assessment` 用主题的提醒色 / 危险色；点按可切换“表格视图” |
+| `diagram` | 本轮 Flutter：`FallbackNote`；图形组件由支持它的宿主提供 | 图形渲染合同：省略 `direction` 为竖排；横排超过 5 步或块实际宽度小于 520px 时改竖排，箭头随之转向；每步 1–3 个框并排；分组覆盖包含首尾的连续步骤，允许单步组、不得重叠。省略 `link` 为无字单向箭头，省略 `link.arrow` 为 `forward`，最后一步的 `link` 忽略；未知图标只省略图标，框照常画。没有内置转换降级链，直接显示 `fallbackText` |
 | `status` | `StatusView` | 状态图标 + 文字；有 `progress` 显示进度条；有 `steps` 显示步骤列表 |
 | `choice` | `ChoiceView` | 选项按钮组；单选 / 多选；块是中断的提问且 `otherInput` 不为 `false` 时，选项后面固定多一个“输入其他内容”（点了进入输入框的回答状态，见 4.5）；已经结束的消息里 `allowFreeText` 时提示“也可以直接发消息回答”；点按后整组显示“提交中”；`state` 非 `open` 时显示**服务端记录的**选项、回答者与时间，并禁用 |
 | `confirmation` | `ConfirmationCard` | 标题、说明、细节表；破坏性操作的确认按钮用主题的“危险”样式，且必须二次点按（或按住）才能提交；是中断的块且 `otherInput` 不为 `false` 时按钮下方有“输入其他内容”；点按后显示“提交中”，服务端确认后才显示“已确认 / 已取消” |
 | `form_intent` | `IntentForm` | 按字段类型生成输入控件；客户端先做必填 / 范围 / 长度校验；服务端返回的 `fieldErrors` 显示在对应字段下；是中断的块且 `otherInput` 不为 `false` 时提交按钮下方有“输入其他内容”；`title` 可选，没有标题时不留空行 |
 
 默认组件只用 Flutter `widgets` 层能力和主题接口取样式，不依赖 Material 的颜色或文字主题；按钮（含禁用态）、字段错误与进度文字显式取 ChatWeave 语义颜色，发送与关闭图标用 Canvas 自绘，不需要 MaterialIcons 字体（Markdown 渲染依赖的 `flutter_markdown_plus` 内部用到 Material，样式表仍完全由主题接口提供）。
+
+`diagram` 是协议内置类型，本轮 Flutter 默认注册表识别并声明 `diagram: 1`，但不实现画图组件，只按第 4 节显示块的 `fallbackText`；该声明不表示已支持画图。宿主可用 `override` 提供图形组件。图标格式与 28 个已知名字见 [protocol.md 的 diagram 小节](protocol.md#diagram)；发送校验不得把名单作为白名单。
 
 ## 3. Markdown 安全子集
 

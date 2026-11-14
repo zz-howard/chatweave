@@ -1,0 +1,82 @@
+{
+  "id": "diagram-1",
+  "type": "diagram",
+  "schemaVersion": 1,
+  "data": {
+    "steps": [
+      {
+        "id": "s0",
+        "nodes": [
+          {
+            "label": "A"
+          }
+        ]
+      },
+      {
+        "id": "s1",
+        "nodes": [
+          {
+            "label": "A"
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "nodes": [
+          {
+            "label": "A"
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "nodes": [
+          {
+            "label": "A"
+          }
+        ]
+      },
+      {
+        "id": "s4",
+        "nodes": [
+          {
+            "label": "A"
+          }
+        ]
+      },
+      {
+        "id": "s5",
+        "nodes": [
+          {
+            "label": "A"
+          }
+        ]
+      },
+      {
+        "id": "s6",
+        "nodes": [
+          {
+            "label": "A"
+          }
+        ]
+      },
+      {
+        "id": "s7",
+        "nodes": [
+          {
+            "label": "A"
+          }
+        ]
+      },
+      {
+        "id": "s8",
+        "nodes": [
+          {
+            "label": "A"
+          }
+        ]
+      }
+    ]
+  },
+  "fallbackText": "Start then finish"
+}

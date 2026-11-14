@@ -104,6 +104,13 @@ void main() {
 }
 
 const semanticCodes = <String, String>{
+  'diagram-duplicate-step-id': 'duplicate_diagram_step_id',
+  'diagram-group-from-unknown': 'invalid_diagram_group_endpoint',
+  'diagram-group-to-unknown': 'invalid_diagram_group_endpoint',
+  'diagram-group-no-present-id': 'invalid_diagram_group_endpoint',
+  'diagram-group-reversed': 'invalid_diagram_group_order',
+  'diagram-groups-overlap': 'overlapping_diagram_groups',
+  'diagram-groups-shared-step': 'overlapping_diagram_groups',
   'invalid-seq-gap': 'seq_gap',
   'invalid-duplicate-block-id': 'duplicate_block_id',
   'invalid-delta-before-start': 'unknown_block',
