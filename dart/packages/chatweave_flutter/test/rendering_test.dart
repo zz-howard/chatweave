@@ -26,8 +26,18 @@ void main() {
       'fallbackText': 'Client sends a message to Server.',
       'data': {
         'steps': [
-          {'id': 'client', 'nodes': [{'label': 'Client'}]},
-          {'id': 'server', 'nodes': [{'label': 'Server'}]},
+          {
+            'id': 'client',
+            'nodes': [
+              {'label': 'Client'}
+            ]
+          },
+          {
+            'id': 'server',
+            'nodes': [
+              {'label': 'Server'}
+            ]
+          },
         ],
       },
     });
@@ -40,7 +50,8 @@ void main() {
     expect(find.byType(MarkdownBlockView), findsOneWidget);
     expect(fallbackConversion(diagram), isNull);
     expect(errors, hasLength(1));
-    expect((errors.single as ProtocolError).code, 'unsupported_type_or_version');
+    expect(
+        (errors.single as ProtocolError).code, 'unsupported_type_or_version');
     expect(registry.capabilities().json['blocks'], isNot(contains('diagram')));
     expect(tester.takeException(), isNull);
   });
@@ -61,8 +72,16 @@ void main() {
       'fallbackText': 'First to second',
       'data': {
         'steps': [
-          {'nodes': [{'label': 'First'}]},
-          {'nodes': [{'label': 'Second'}]},
+          {
+            'nodes': [
+              {'label': 'First'}
+            ]
+          },
+          {
+            'nodes': [
+              {'label': 'Second'}
+            ]
+          },
         ],
       },
     });
