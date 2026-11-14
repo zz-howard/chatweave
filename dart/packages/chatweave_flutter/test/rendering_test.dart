@@ -39,6 +39,37 @@ void main() {
     expect(find.byType(FallbackNote), findsOneWidget);
     expect(find.byType(MarkdownBlockView), findsOneWidget);
     expect(fallbackConversion(diagram), isNull);
+    expect(errors, hasLength(1));
+    expect((errors.single as ProtocolError).code, 'unsupported_type_or_version');
+    expect(registry.capabilities().json['blocks'], isNot(contains('diagram')));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('host_can_override_diagram_rendering_and_capability',
+      (tester) async {
+    final errors = <Object>[];
+    final registry = BlockRegistry.withDefaults(
+        onBlockRenderError: (_, error) => errors.add(error));
+    registry.override(
+      'diagram',
+      BlockRegistration(build: (_, __) => const Text('Host diagram')),
+    );
+    final diagram = Block.fromJson({
+      'id': 'diagram',
+      'type': 'diagram',
+      'schemaVersion': 1,
+      'fallbackText': 'First to second',
+      'data': {
+        'steps': [
+          {'nodes': [{'label': 'First'}]},
+          {'nodes': [{'label': 'Second'}]},
+        ],
+      },
+    });
+    await tester.pumpWidget(app(registry.render(diagram)));
+    expect(find.text('Host diagram'), findsOneWidget);
+    expect(find.byType(FallbackNote), findsNothing);
+    expect((registry.capabilities().json['blocks'] as Map)['diagram'], 1);
     expect(errors, isEmpty);
     expect(tester.takeException(), isNull);
   });

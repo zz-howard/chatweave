@@ -20,6 +20,7 @@ void main() {
         'comparison' => 'subjects',
         'breakdown' => 'parts',
         'category_series' => 'points',
+        'diagram' => 'steps',
         'status' => 'state',
         'choice' => 'options',
         'confirmation' => 'action',

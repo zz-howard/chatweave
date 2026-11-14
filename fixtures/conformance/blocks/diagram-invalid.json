@@ -1,0 +1,7 @@
+{
+  "id": "b1",
+  "type": "diagram",
+  "schemaVersion": 1,
+  "data": {"steps": true},
+  "fallbackText": "天气晴朗，记得浇花。"
+}

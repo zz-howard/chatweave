@@ -1,0 +1,13 @@
+{
+  "id": "b1",
+  "type": "diagram",
+  "schemaVersion": 1,
+  "data": {
+    "title": "天气与待办",
+    "steps": [
+      {"id": "s1", "nodes": [{"label": "天气"}]},
+      {"id": "s2", "nodes": [{"label": "待办"}]}
+    ]
+  },
+  "fallbackText": "天气晴朗，记得浇花。"
+}

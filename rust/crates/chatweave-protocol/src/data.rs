@@ -81,13 +81,7 @@ data_struct!(CategoryPoint {
 });
 data_struct!(CategorySeriesData { points: Vec<CategoryPoint> });
 data_struct!(DiagramNode { label: String });
-data_struct!(DiagramLink {});
 data_struct!(DiagramStep { nodes: Vec<DiagramNode> });
-data_struct!(DiagramGroup {
-    label: String,
-    from: String,
-    to: String
-});
 data_struct!(DiagramData { steps: Vec<DiagramStep> });
 data_struct!(StatusData {
     label: String,

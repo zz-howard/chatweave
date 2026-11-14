@@ -627,7 +627,7 @@ void main() {
                   : 1),
     );
     expect(count, lessThanOrEqualTo(300));
-    expect(count, 258);
+    expect(count, 270);
   });
 }
 
@@ -913,6 +913,28 @@ Block boundary(Block b, {bool maximum = false}) {
       data['steps'] = [
         for (var i = 0; i < 12; i++) {'label': '待办 $i', 'state': 'succeeded'},
       ];
+    case 'diagram':
+      data['title'] = maximum ? '天' * 120 : '天气';
+      data['summary'] = maximum ? '气' * 2000 : '待办';
+      data['direction'] = maximum ? 'horizontal' : 'vertical';
+      data['steps'] = [
+        for (var i = 0; i < (maximum ? 8 : 2); i++)
+          {
+            'id': 's$i',
+            'nodes': [
+              for (var j = 0; j < (maximum ? 3 : 1); j++)
+                {
+                  'label': maximum ? '天' * 40 : '天气',
+                  'detail': maximum ? '气' * 120 : '待办',
+                },
+            ],
+          },
+      ];
+      if (maximum)
+        data['groups'] = [
+          for (var i = 0; i < 3; i++)
+            {'label': '天' * 24, 'from': 's${i * 2}', 'to': 's${i * 2 + 1}'},
+        ];
     case 'choice':
       data['options'] = [
         for (var i = 0; i < 10; i++) {'id': 'weather_$i', 'label': '查天气 $i'},

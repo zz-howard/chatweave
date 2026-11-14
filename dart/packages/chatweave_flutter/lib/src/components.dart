@@ -851,7 +851,6 @@ class BuiltinBlockView extends StatelessWidget {
         'metric' => MetricTile(data: block.data),
         'metric_group' => MetricGrid(data: block.data),
         'dataset' => DataTableView(data: block.data),
-        'diagram' => FallbackNote(block: block),
         'time_series' => LineChartView(
             data: block.data,
             summary: block['fallbackText'] as String? ?? '',

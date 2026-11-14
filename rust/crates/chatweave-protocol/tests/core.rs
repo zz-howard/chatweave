@@ -101,13 +101,15 @@ fn diagram_defaults_and_group_ranges_use_wire_step_order() {
         {"label": "Second", "from": "second", "to": "second"}
     ]);
     assert!(validator.validate(DocumentKind::Block, &block).is_ok());
+    let parsed = Block(block.clone()).typed_data().unwrap().unwrap();
+    assert_eq!(parsed.to_value().unwrap(), block["data"]);
     block["data"]["groups"][1]["from"] = json!("first");
     assert_eq!(
         validator
             .validate(DocumentKind::Block, &block)
             .unwrap_err()
             .code,
-        "diagram_group_overlap"
+        "overlapping_diagram_groups"
     );
     block["data"]["groups"] = json!([{"label": "Reverse", "from": "second", "to": "first"}]);
     assert_eq!(
@@ -115,7 +117,7 @@ fn diagram_defaults_and_group_ranges_use_wire_step_order() {
             .validate(DocumentKind::Block, &block)
             .unwrap_err()
             .code,
-        "diagram_group_order"
+        "invalid_diagram_group_order"
     );
     block["data"]["groups"][0]["to"] = json!("missing");
     assert_eq!(
@@ -123,7 +125,7 @@ fn diagram_defaults_and_group_ranges_use_wire_step_order() {
             .validate(DocumentKind::Block, &block)
             .unwrap_err()
             .code,
-        "diagram_group_endpoint"
+        "invalid_diagram_group_endpoint"
     );
     block["data"]["steps"][1]["id"] = json!("first");
     assert_eq!(

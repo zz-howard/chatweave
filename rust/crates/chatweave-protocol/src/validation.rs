@@ -462,7 +462,7 @@ fn check_diagram(data: &Value) -> Result<()> {
                     .copied()
                     .ok_or_else(|| {
                         ProtocolError::new(
-                            "diagram_group_endpoint",
+                            "invalid_diagram_group_endpoint",
                             format!("{path}/{field}"),
                             "group endpoints must name existing diagram steps",
                         )
@@ -472,7 +472,7 @@ fn check_diagram(data: &Value) -> Result<()> {
             let to = endpoint("to")?;
             if from > to {
                 return Err(ProtocolError::new(
-                    "diagram_group_order",
+                    "invalid_diagram_group_order",
                     &path,
                     "group endpoints must follow diagram step order",
                 ));
@@ -480,7 +480,7 @@ fn check_diagram(data: &Value) -> Result<()> {
             for step in from..=to {
                 if !grouped.insert(step) {
                     return Err(ProtocolError::new(
-                        "diagram_group_overlap",
+                        "overlapping_diagram_groups",
                         &path,
                         "diagram groups cannot share a step",
                     ));

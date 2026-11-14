@@ -30,7 +30,7 @@ void main() {
           'nodes': [
             {'label': 'First'},
           ],
-          'link': {},
+          'link': <String, Object?>{},
         },
         {
           'id': 'second',

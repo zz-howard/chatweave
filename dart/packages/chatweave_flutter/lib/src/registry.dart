@@ -43,7 +43,8 @@ class BlockRegistry {
   factory BlockRegistry.withDefaults({BlockRenderError? onBlockRenderError}) {
     final registry =
         BlockRegistry.markdownOnly(onBlockRenderError: onBlockRenderError);
-    for (final type in builtinTypes.where((t) => t != 'markdown')) {
+    for (final type
+        in builtinTypes.where((t) => t != 'markdown' && t != 'diagram')) {
       registry._entries[type] = [
         BlockRegistration(
             parse: (_) {},

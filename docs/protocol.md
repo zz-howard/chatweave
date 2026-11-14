@@ -276,7 +276,7 @@ v1 里“语义类型 → 组件”的映射是**客户端注册表上的确定�
 { "id": "flow", "type": "diagram", "schemaVersion": 1, "data": { "steps": [{ "nodes": [{ "label": "输入" }] }, { "nodes": [{ "label": "输出" }] }] }, "fallbackText": "输入 → 输出" }
 ```
 
-Flutter 本轮不实现画图组件，只按第 6 节显示 `fallbackText`；默认注册表识别 `diagram`，其能力声明只保证本轮的文字兜底，图形渲染需由宿主提供。
+Flutter 本轮不实现画图组件，默认注册表不注册 `diagram`，能力声明中也不包含它；收到该块时按第 6 节显示 `fallbackText`。宿主可用 `override` 提供图形组件，注册后再声明对应能力。
 
 #### `status`
 
@@ -672,7 +672,7 @@ streaming ──message.paused──▶ paused ──(回答) block.patch + mess
 }
 ```
 
-本轮 Flutter 默认注册表也会声明 `diagram: 1`，但只显示其 `fallbackText`；该声明不表示已经实现图形组件。
+上例展示支持图形渲染的宿主能力。本轮 Flutter 默认注册表不声明 `diagram: 1`，收到该块时显示其 `fallbackText`；宿主通过 `override` 提供图形组件后才声明该能力。
 
 放不进请求体的场合（例如 SSE 的 GET 请求）用紧凑请求头：
 
