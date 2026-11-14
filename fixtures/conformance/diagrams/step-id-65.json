@@ -1,0 +1,26 @@
+{
+  "id": "diagram",
+  "type": "diagram",
+  "schemaVersion": 1,
+  "data": {
+    "steps": [
+      {
+        "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "nodes": [
+          {
+            "label": "First"
+          }
+        ]
+      },
+      {
+        "id": "b",
+        "nodes": [
+          {
+            "label": "Second"
+          }
+        ]
+      }
+    ]
+  },
+  "fallbackText": "First then second"
+}

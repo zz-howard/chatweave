@@ -11,6 +11,9 @@
     }
   ],
   "cases": [
+    { "name": "diagram-step-id-boundary", "kind": "block", "file": "diagrams/step-id-boundary.json", "schema": "content-block.schema.json" },
+    { "name": "diagram-step-id-65", "kind": "block", "file": "diagrams/step-id-65.json", "schema": "content-block.schema.json", "rejectAt": "schema", "expectedError": "diagrams/step-id-65.expected-error.json" },
+    { "name": "diagram-title-empty", "kind": "block", "file": "diagrams/title-empty.json", "schema": "content-block.schema.json", "rejectAt": "schema", "expectedError": "diagrams/title-empty.expected-error.json" },
     {
       "name": "diagram-no-step-ids",
       "kind": "block",
